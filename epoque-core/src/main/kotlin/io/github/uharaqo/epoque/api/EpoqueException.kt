@@ -5,4 +5,8 @@ sealed class EpoqueException(msg: String, t: Throwable?) : RuntimeException(msg,
   class EventSerializationFailure(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
 
   class EventWriteFailure(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
+
+  class EventLoadFailure(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
+
+  class SummaryAggregationFailure(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
 }
