@@ -56,7 +56,7 @@ class CommandExecutorSpec : StringSpec(
         journalKey.groupId,
         dummyCommandHandler,
         dummyEventCodecRegistry,
-        dummySummaryGenerator,
+        dummyEventHandlerExecutor,
         dummyEventLoader,
         eventWriter,
         dummyTransactionStarter,

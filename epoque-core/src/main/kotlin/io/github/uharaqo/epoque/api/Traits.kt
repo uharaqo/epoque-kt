@@ -1,6 +1,7 @@
 package io.github.uharaqo.epoque.api
 
 import arrow.core.Either
+import arrow.core.flatMap
 import arrow.core.raise.either
 import arrow.core.raise.ensure
 import io.github.uharaqo.epoque.api.EpoqueException.CommandDeserializationException
@@ -12,41 +13,43 @@ import io.github.uharaqo.epoque.api.EpoqueException.UnknownException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.toList
 
-interface EventSerializable<E : Any> {
-  val eventCodecRegistry: EventCodecRegistry
+interface CanSerializeEvents<E : Any> {
+  val eventCodecRegistry: EventCodecRegistry<E>
 
-  fun serialize(
+  fun serializeEvents(
     currentVersion: Version,
     events: List<E>,
   ): Either<EventSerializationFailure, List<VersionedEvent>> = either {
     events.withIndex().map { (i, e) ->
       val version = currentVersion + (i + 1)
+      serializeEvent(e, version)
+    }.bindAll()
+  }
 
+  fun serializeEvent(e: E, version: Version): Either<EventSerializationFailure, VersionedEvent> =
+    either {
       val eventType = EventType.of(e::class.java)
-      val codec = eventCodecRegistry.get<E>(eventType)
       val serialized =
-        codec
-          ?.serialize(e)
-          ?.mapLeft { EventSerializationFailure("Failed to serialize event: $eventType", it) }
-          ?.bind()
-          ?: raise(EventSerializationFailure("EventCodec not found: $eventType"))
+        eventCodecRegistry.find(eventType)
+          .flatMap { it.serialize(e) }
+          .mapLeft { EventSerializationFailure("Failed to serialize event: $eventType", it) }
+          .bind()
 
       VersionedEvent(version, eventType, serialized)
     }
-  }
 }
 
-interface EventWritable<E : Any> : EventSerializable<E> {
+interface CanWriteEvents<E : Any> : CanSerializeEvents<E> {
   val eventWriter: EventWriter
 
-  suspend fun write(
+  suspend fun writeEvents(
     journalKey: JournalKey,
     currentVersion: Version,
     events: List<E>,
     tx: TransactionContext,
   ): Either<EventWriteFailure, List<VersionedEvent>> = either {
     val versionedEvents =
-      serialize(currentVersion, events)
+      serializeEvents(currentVersion, events)
         .mapLeft { EventWriteFailure("Failed to serialize event", it) }.bind()
 
     eventWriter.write(journalKey, versionedEvents, tx).bind()
@@ -55,15 +58,15 @@ interface EventWritable<E : Any> : EventSerializable<E> {
   }
 }
 
-interface SummaryAggregatable<S> {
-  val summaryGenerator: SummaryGenerator<S>
+interface CanAggregateEvents<S> {
+  val eventHandlerExecutor: EventHandlerExecutor<S>
 
-  fun aggregate(
+  fun aggregateEvents(
     events: List<VersionedEvent>,
     cachedSummary: VersionedSummary<S>?,
   ): Either<SummaryAggregationFailure, VersionedSummary<S>> = either {
     var currentVersion = (cachedSummary?.version ?: Version.ZERO).unwrap
-    val initialSummary = cachedSummary?.summary ?: summaryGenerator.emptySummary
+    val initialSummary = cachedSummary?.summary ?: eventHandlerExecutor.emptySummary
 
     val summary = events.fold(initialSummary) { prevSummary, ve ->
       currentVersion += 1
@@ -72,14 +75,14 @@ interface SummaryAggregatable<S> {
         SummaryAggregationFailure("Event version mismatch. prev: ${currentVersion - 1}, received: ${ve.version}: ${ve.type}")
       }
 
-      summaryGenerator.generateSummary(prevSummary, ve.event).bind()
+      eventHandlerExecutor.computeNextSummary(prevSummary, ve.type, ve.event).bind()
     }
 
     VersionedSummary(Version(currentVersion), summary)
   }
 }
 
-interface SummaryLoadable<S> : SummaryAggregatable<S> {
+interface CanLoadSummary<S> : CanAggregateEvents<S> {
   val eventLoader: EventLoader
 
   suspend fun loadSummary(
@@ -90,13 +93,13 @@ interface SummaryLoadable<S> : SummaryAggregatable<S> {
     val prevVersion = cachedSummary?.version ?: Version.ZERO
     val events = eventLoader.queryById(journalKey, prevVersion, tx).bind().toList()
 
-    aggregate(events, cachedSummary).bind()
+    aggregateEvents(events, cachedSummary).bind()
   }
 }
 
-interface CommandExecutable<C, S, E : Any> :
-  SummaryLoadable<S>,
-  EventWritable<E>,
+interface CanExecuteCommandHandler<C, S, E : Any> :
+  CanLoadSummary<S>,
+  CanWriteEvents<E>,
   TransactionStarter {
 
   val journalGroupId: JournalGroupId
@@ -123,7 +126,7 @@ interface CommandExecutable<C, S, E : Any> :
 
     val events = commandHandler.handle(command, currentSummary).bind()
 
-    val versionedEvents = write(journalKey, currentVersion, events, tx).bind()
+    val versionedEvents = writeEvents(journalKey, currentVersion, events, tx).bind()
 
     CommandOutput(versionedEvents)
   }
@@ -142,9 +145,9 @@ interface CommandExecutable<C, S, E : Any> :
       }
 }
 
-interface CommandProcessable<C> : CommandProcessor {
+interface CanProcessCommand<C> : CommandProcessor {
   val commandCodec: CommandCodec<C>
-  val commandExecutable: CommandExecutable<C, *, *>
+  val canExecuteCommandHandler: CanExecuteCommandHandler<C, *, *>
 
   override suspend fun process(input: CommandInput): Either<EpoqueException, CommandOutput> =
     either {
@@ -153,6 +156,6 @@ interface CommandProcessable<C> : CommandProcessor {
           .mapLeft { raise(CommandDeserializationException("Failed to deserialize command: ${input.type}")) }
           .bind()
 
-      commandExecutable.execute(input.id, command).bind()
+      canExecuteCommandHandler.execute(input.id, command).bind()
     }
 }

@@ -8,8 +8,12 @@ interface EventHandler<S, E> {
   fun handle(summary: S, event: E): Either<EventHandlerFailure, S>
 }
 
-interface SummaryGenerator<S> {
+interface EventHandlerExecutor<S> {
   val emptySummary: S
 
-  fun generateSummary(prevSummary: S, event: SerializedEvent): Either<SummaryAggregationFailure, S>
+  fun computeNextSummary(
+    prevSummary: S,
+    eventType: EventType,
+    event: SerializedEvent,
+  ): Either<SummaryAggregationFailure, S>
 }

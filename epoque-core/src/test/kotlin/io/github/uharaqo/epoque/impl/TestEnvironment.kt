@@ -8,6 +8,7 @@ import io.github.uharaqo.epoque.api.EpoqueException.CommandHandlerFailure
 import io.github.uharaqo.epoque.api.EpoqueException.EventLoadFailure
 import io.github.uharaqo.epoque.api.EpoqueException.EventWriteFailure
 import io.github.uharaqo.epoque.api.EpoqueException.SummaryAggregationFailure
+import io.github.uharaqo.epoque.api.EventHandlerExecutor
 import io.github.uharaqo.epoque.api.EventLoader
 import io.github.uharaqo.epoque.api.EventType
 import io.github.uharaqo.epoque.api.EventWriter
@@ -15,7 +16,6 @@ import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.SerializedEvent
-import io.github.uharaqo.epoque.api.SummaryGenerator
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.TransactionStarter
 import io.github.uharaqo.epoque.api.Version
@@ -32,15 +32,14 @@ abstract class TestEnvironment {
   val dummyEvent2 = SerializedEvent(SerializedJson("""{"id": 1}"""))
 
   val dummyEventCodecRegistry =
-    EventCodecRegistryBuilder<TestEvent>()
-      .register<TestEvent.ResourceCreated>()
-      .build()
+    EventCodecRegistryBuilder<TestEvent>().register<TestEvent.ResourceCreated>().build()
 
-  val dummySummaryGenerator = object : SummaryGenerator<MockSummary> {
+  val dummyEventHandlerExecutor = object : EventHandlerExecutor<MockSummary> {
     override val emptySummary: MockSummary = MockSummary()
 
-    override fun generateSummary(
+    override fun computeNextSummary(
       prevSummary: MockSummary,
+      eventType: EventType,
       event: SerializedEvent,
     ): Either<SummaryAggregationFailure, MockSummary> = (prevSummary + event).right()
   }

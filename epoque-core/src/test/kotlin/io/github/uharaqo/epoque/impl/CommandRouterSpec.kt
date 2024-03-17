@@ -6,10 +6,10 @@ import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.SerializedCommand
+import io.github.uharaqo.epoque.api.toCommandCodec
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestCommand
 import io.github.uharaqo.epoque.serialization.JsonCodec
 import io.github.uharaqo.epoque.serialization.SerializedJson
-import io.github.uharaqo.epoque.serialization.toCommandCodec
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.core.spec.style.StringSpec
 import io.mockk.coEvery

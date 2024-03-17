@@ -1,30 +1,27 @@
 package io.github.uharaqo.epoque.serialization
 
 import arrow.core.Either
-import io.github.uharaqo.epoque.api.CommandCodec
-import io.github.uharaqo.epoque.api.EventCodec
-import io.github.uharaqo.epoque.api.SerializedCommand
+import io.github.uharaqo.epoque.api.DataCodec
 import io.github.uharaqo.epoque.api.SerializedData
-import io.github.uharaqo.epoque.api.SerializedEvent
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.serializer
 
 @JvmInline
-value class SerializedJson(val value: String) : SerializedData {
-  override fun toString(): String = value
+value class SerializedJson(private val unwrap: String) : SerializedData {
+  override fun toText(): String = unwrap
+
+  override fun toString(): String = toText()
 }
 
-class JsonCodec<T>(private val serializer: KSerializer<T>) {
+class JsonCodec<T>(private val serializer: KSerializer<T>) : DataCodec<T, SerializedData> {
 
-  fun serialize(v: T): Either<Throwable, SerializedJson> = Either.catch {
-    kotlinx.serialization.json.Json.encodeToString(serializer, v).let(::SerializedJson)
+  override fun serialize(value: T): Either<Throwable, SerializedJson> = Either.catch {
+    kotlinx.serialization.json.Json.encodeToString(serializer, value).let(::SerializedJson)
   }
 
-  fun deserialize(json: SerializedData): Either<Throwable, T> = Either.catch {
-    require(json is SerializedJson) { "Unexpected format: ${json::class.java.canonicalName}" }
-
-    kotlinx.serialization.json.Json.decodeFromString(serializer, json.value)
+  override fun deserialize(serialized: SerializedData): Either<Throwable, T> = Either.catch {
+    kotlinx.serialization.json.Json.decodeFromString(serializer, serialized.toText())
   }
 
   companion object {
@@ -32,25 +29,3 @@ class JsonCodec<T>(private val serializer: KSerializer<T>) {
     inline fun <reified T> of(): JsonCodec<T> = JsonCodec(serializer<T>())
   }
 }
-
-@JvmInline
-value class JsonEventCodec<E>(private val codec: JsonCodec<E>) : EventCodec<E> {
-  override fun serialize(value: E): Either<Throwable, SerializedEvent> =
-    codec.serialize(value).map { SerializedEvent(it) }
-
-  override fun deserialize(serialized: SerializedEvent): Either<Throwable, E> =
-    codec.deserialize(serialized.unwrap)
-}
-
-fun <T> JsonCodec<T>.toEventCodec(): EventCodec<T> = JsonEventCodec(this)
-
-@JvmInline
-value class JsonCommandCodec<E>(private val codec: JsonCodec<E>) : CommandCodec<E> {
-  override fun serialize(value: E): Either<Throwable, SerializedCommand> =
-    codec.serialize(value).map { SerializedCommand(it) }
-
-  override fun deserialize(serialized: SerializedCommand): Either<Throwable, E> =
-    codec.deserialize(serialized.unwrap)
-}
-
-fun <T> JsonCodec<T>.toCommandCodec(): CommandCodec<T> = JsonCommandCodec(this)
