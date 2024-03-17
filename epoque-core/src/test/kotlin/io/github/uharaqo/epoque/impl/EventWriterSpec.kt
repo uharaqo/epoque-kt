@@ -6,9 +6,6 @@ import io.github.uharaqo.epoque.api.EventCodec
 import io.github.uharaqo.epoque.api.EventCodecRegistry
 import io.github.uharaqo.epoque.api.EventType
 import io.github.uharaqo.epoque.api.EventWriter
-import io.github.uharaqo.epoque.api.JournalGroupId
-import io.github.uharaqo.epoque.api.JournalId
-import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.SerializedEvent
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.Version
@@ -17,7 +14,6 @@ import io.github.uharaqo.epoque.api.toEventCodec
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestEvent
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestEvent.ResourceCreated
 import io.github.uharaqo.epoque.serialization.JsonCodec
-import io.github.uharaqo.epoque.serialization.SerializedJson
 import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -27,7 +23,7 @@ import io.mockk.slot
 
 class EventWriterSpec : StringSpec(
   {
-    val event1 = ResourceCreated("foo")
+    val event1 = dummyEvents[0]
 
     "JsonEventCodec works as expected" {
       val codec = JsonCodec.of<ResourceCreated>().toEventCodec()
@@ -68,7 +64,7 @@ class EventWriterSpec : StringSpec(
       coEvery { eventWriter.write(any(), capture(writtenEvents), any()) } returns Unit.right()
 
       canWriteEvents.writeEvents(
-        journalKey = JournalKey(JournalGroupId.of<TestEvent>(), JournalId("bar")),
+        journalKey = dummyJournalKey,
         currentVersion = Version.ZERO,
         events = listOf(event1, event1),
         tx = tx,
@@ -78,7 +74,7 @@ class EventWriterSpec : StringSpec(
         VersionedEvent(
           version = Version.ZERO,
           type = EventType(ResourceCreated::class.qualifiedName!!),
-          event = SerializedEvent(SerializedJson("""{"name":"foo"}""")),
+          event = serializedEvent1,
         )
           .let { listOf(it.copy(version = Version(1)), it.copy(version = Version(2))) }
 

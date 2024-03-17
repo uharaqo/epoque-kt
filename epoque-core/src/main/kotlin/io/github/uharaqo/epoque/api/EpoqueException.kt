@@ -18,7 +18,9 @@ sealed class EpoqueException(msg: String, t: Throwable?) : RuntimeException(msg,
 
   class UnexpectedCommand(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
 
-  class CommandDeserializationException(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
+  class CommandSerializationFailure(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
+
+  class CommandDeserializationFailure(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
 
   class CommandHandlerFailure(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
 

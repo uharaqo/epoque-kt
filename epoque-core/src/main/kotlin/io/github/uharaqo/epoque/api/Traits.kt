@@ -4,7 +4,6 @@ import arrow.core.Either
 import arrow.core.flatMap
 import arrow.core.raise.either
 import arrow.core.raise.ensure
-import io.github.uharaqo.epoque.api.EpoqueException.CommandDeserializationException
 import io.github.uharaqo.epoque.api.EpoqueException.EventSerializationFailure
 import io.github.uharaqo.epoque.api.EpoqueException.EventWriteFailure
 import io.github.uharaqo.epoque.api.EpoqueException.SummaryAggregationFailure
@@ -29,14 +28,12 @@ interface CanSerializeEvents<E : Any> {
   fun serializeEvent(e: E, version: Version): Either<EventSerializationFailure, VersionedEvent> =
     either {
       val eventType = EventType.of(e::class.java)
-      val serialized =
-        eventCodecRegistry.find(eventType)
-          .flatMap { it.serialize(e) }
-          .mapLeft { EventSerializationFailure("Failed to serialize event: $eventType", it) }
-          .bind()
+      val codec = eventCodecRegistry.find(eventType).bind()
+      val serialized = codec.serialize(e).bind()
 
       VersionedEvent(version, eventType, serialized)
     }
+      .mapLeft { EventSerializationFailure("Failed to serialize event: ${e::class.java}") }
 }
 
 interface CanWriteEvents<E : Any> : CanSerializeEvents<E> {
@@ -56,6 +53,25 @@ interface CanWriteEvents<E : Any> : CanSerializeEvents<E> {
 
     versionedEvents
   }
+}
+
+interface CanComputeNextSummary<S, E : Any> : EventHandlerExecutor<S> {
+  val eventHandlerRegistry: EventHandlerRegistry<S, E>
+  val eventCodecRegistry: EventCodecRegistry<E>
+
+  override fun computeNextSummary(
+    prevSummary: S,
+    eventType: EventType,
+    event: SerializedEvent,
+  ): Either<SummaryAggregationFailure, S> = either {
+    val eventHandler = eventHandlerRegistry.find(eventType).bind()
+
+    val codec = eventCodecRegistry.find(eventType).bind()
+    val deserialized = codec.deserialize(event).bind()
+
+    eventHandler.handle(prevSummary, deserialized).bind()
+  }
+    .mapLeft { SummaryAggregationFailure("Failed to compute summary: $eventType", it) }
 }
 
 interface CanAggregateEvents<S> {
@@ -150,12 +166,6 @@ interface CanProcessCommand<C> : CommandProcessor {
   val canExecuteCommandHandler: CanExecuteCommandHandler<C, *, *>
 
   override suspend fun process(input: CommandInput): Either<EpoqueException, CommandOutput> =
-    either {
-      val command =
-        commandCodec.deserialize(input.payload)
-          .mapLeft { raise(CommandDeserializationException("Failed to deserialize command: ${input.type}")) }
-          .bind()
-
-      canExecuteCommandHandler.execute(input.id, command).bind()
-    }
+    commandCodec.deserialize(input.payload)
+      .flatMap { command -> canExecuteCommandHandler.execute(input.id, command) }
 }
