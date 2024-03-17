@@ -6,8 +6,8 @@ import io.github.uharaqo.epoque.api.EpoqueException.CommandHandlerFailure
 import io.github.uharaqo.epoque.api.EpoqueException.EventLoadFailure
 import io.github.uharaqo.epoque.api.EpoqueException.EventWriteFailure
 import io.github.uharaqo.epoque.api.EpoqueException.SummaryAggregationFailure
-import io.github.uharaqo.epoque.builder.CommandCodecRegistryBuilder
-import io.github.uharaqo.epoque.builder.EventCodecRegistryBuilder
+import io.github.uharaqo.epoque.impl.CommandCodecRegistryBuilder
+import io.github.uharaqo.epoque.impl.EventCodecRegistryBuilder
 import io.github.uharaqo.epoque.serialization.SerializedJson
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow

@@ -4,7 +4,7 @@ import arrow.core.getOrElse
 import arrow.core.right
 import io.github.uharaqo.epoque.api.TestEnvironment.TestCommand.Create
 import io.github.uharaqo.epoque.api.TestEnvironment.TestEvent.ResourceCreated
-import io.github.uharaqo.epoque.builder.CommandExecutor
+import io.github.uharaqo.epoque.impl.CommandExecutor
 import io.github.uharaqo.epoque.serialization.SerializedJson
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.core.spec.style.StringSpec

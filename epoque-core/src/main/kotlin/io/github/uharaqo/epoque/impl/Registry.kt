@@ -1,4 +1,4 @@
-package io.github.uharaqo.epoque.builder
+package io.github.uharaqo.epoque.impl
 
 interface Registry<K : Any, V : Any> {
   operator fun get(key: K): V?

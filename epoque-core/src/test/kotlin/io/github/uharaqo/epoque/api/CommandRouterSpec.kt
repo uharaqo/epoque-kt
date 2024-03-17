@@ -2,9 +2,9 @@ package io.github.uharaqo.epoque.api
 
 import arrow.core.right
 import io.github.uharaqo.epoque.api.TestEnvironment.TestCommand
-import io.github.uharaqo.epoque.builder.CommandExecutor
-import io.github.uharaqo.epoque.builder.DefaultCommandRouter
-import io.github.uharaqo.epoque.builder.TypedCommandProcessor
+import io.github.uharaqo.epoque.impl.CommandExecutor
+import io.github.uharaqo.epoque.impl.DefaultCommandRouter
+import io.github.uharaqo.epoque.impl.TypedCommandProcessor
 import io.github.uharaqo.epoque.serialization.JsonCodec
 import io.github.uharaqo.epoque.serialization.SerializedJson
 import io.github.uharaqo.epoque.serialization.toCommandCodec

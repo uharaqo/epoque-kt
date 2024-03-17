@@ -1,4 +1,4 @@
-package io.github.uharaqo.epoque.builder
+package io.github.uharaqo.epoque.impl
 
 import io.github.uharaqo.epoque.api.CommandCodec
 import io.github.uharaqo.epoque.api.CommandCodecRegistry
