@@ -13,3 +13,7 @@ fun interface EventDeserializer<E> {
 }
 
 interface EventCodec<E> : EventSerializer<E>, EventDeserializer<E>
+
+interface EventCodecRegistry {
+  operator fun <E> get(eventType: EventType): EventCodec<E>?
+}
