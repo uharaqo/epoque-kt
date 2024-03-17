@@ -17,3 +17,17 @@ interface EventCodec<E> : EventSerializer<E>, EventDeserializer<E>
 interface EventCodecRegistry {
   operator fun <E> get(eventType: EventType): EventCodec<E>?
 }
+
+fun interface CommandSerializer<C> {
+  fun serialize(value: C): Either<Throwable, SerializedCommand>
+}
+
+fun interface CommandDeserializer<C> {
+  fun deserialize(serialized: SerializedCommand): Either<Throwable, C>
+}
+
+interface CommandCodec<C> : CommandSerializer<C>, CommandDeserializer<C>
+
+interface CommandCodecRegistry {
+  operator fun <C> get(commandType: CommandType): CommandCodec<C>?
+}

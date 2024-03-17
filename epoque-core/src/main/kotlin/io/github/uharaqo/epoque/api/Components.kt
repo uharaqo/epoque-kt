@@ -3,9 +3,13 @@ package io.github.uharaqo.epoque.api
 import arrow.core.Either
 import arrow.core.raise.either
 import arrow.core.raise.ensure
+import io.github.uharaqo.epoque.api.EpoqueException.CommandDeserializationException
 import io.github.uharaqo.epoque.api.EpoqueException.EventSerializationFailure
 import io.github.uharaqo.epoque.api.EpoqueException.EventWriteFailure
 import io.github.uharaqo.epoque.api.EpoqueException.SummaryAggregationFailure
+import io.github.uharaqo.epoque.api.EpoqueException.TimeoutException
+import io.github.uharaqo.epoque.api.EpoqueException.UnknownException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.toList
 
 interface EventSerializable<E : Any> {
@@ -88,4 +92,67 @@ interface SummaryLoadable<S> : SummaryAggregatable<S> {
 
     aggregate(events, cachedSummary).bind()
   }
+}
+
+interface CommandExecutable<C, S, E : Any> :
+  SummaryLoadable<S>,
+  EventWritable<E>,
+  TransactionStarter {
+
+  val journalGroupId: JournalGroupId
+  val commandHandler: CommandHandler<C, S, E>
+
+  suspend fun execute(journalId: JournalId, command: C): Either<EpoqueException, CommandOutput> =
+    either {
+      val journalKey = JournalKey(journalGroupId, journalId)
+      val timeoutMillis = 10L // TODO
+
+      return startTransactionAndLock(journalKey) { tx ->
+        withTimeout(timeoutMillis) {
+          execute(journalKey, command, tx).bind()
+        }.bind() // make sure to throw an exception for rollback
+      }
+    }
+
+  suspend fun execute(
+    journalKey: JournalKey,
+    command: C,
+    tx: TransactionContext,
+  ): Either<EpoqueException, CommandOutput> = either {
+    val (currentVersion: Version, currentSummary: S) = loadSummary(journalKey, tx).bind()
+
+    val events = commandHandler.handle(command, currentSummary).bind()
+
+    val versionedEvents = write(journalKey, currentVersion, events, tx).bind()
+
+    CommandOutput(versionedEvents)
+  }
+
+  private suspend inline fun <T> withTimeout(
+    timeoutMillis: Long,
+    crossinline block: suspend () -> T,
+  ): Either<EpoqueException, T> =
+    Either.catch { kotlinx.coroutines.withTimeout(timeoutMillis) { block() } }
+      .mapLeft {
+        when (it) {
+          is EpoqueException -> it
+          is TimeoutCancellationException -> TimeoutException("Timeout", it)
+          else -> UnknownException("Unexpected failure", it)
+        }
+      }
+}
+
+interface CommandProcessable<C> : CommandProcessor {
+  val commandCodec: CommandCodec<C>
+  val commandExecutable: CommandExecutable<C, *, *>
+
+  override suspend fun process(input: CommandInput): Either<EpoqueException, CommandOutput> =
+    either {
+      val command =
+        commandCodec.deserialize(input.payload)
+          .mapLeft { raise(CommandDeserializationException("Failed to deserialize command: ${input.type}")) }
+          .bind()
+
+      commandExecutable.execute(input.id, command).bind()
+    }
 }
