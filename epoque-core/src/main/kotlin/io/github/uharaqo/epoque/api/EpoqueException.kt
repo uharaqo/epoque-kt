@@ -8,6 +8,8 @@ sealed class EpoqueException(msg: String, t: Throwable?) : RuntimeException(msg,
 
   class EventLoadFailure(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
 
+  class EventHandlerFailure(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
+
   class SummaryAggregationFailure(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
 
   class CommandRouterFailure(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
