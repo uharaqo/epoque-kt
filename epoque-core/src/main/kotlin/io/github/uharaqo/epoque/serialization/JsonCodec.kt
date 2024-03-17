@@ -31,10 +31,13 @@ class JsonCodec<T>(private val serializer: KSerializer<T>) {
   }
 }
 
-class JsonEventCodec<E>(private val codec: JsonCodec<E>) : EventCodec<E> {
+@JvmInline
+value class JsonEventCodec<E>(private val codec: JsonCodec<E>) : EventCodec<E> {
   override fun serialize(value: E): Either<Throwable, SerializedEvent> =
     codec.serialize(value).map { SerializedEvent(it) }
 
   override fun deserialize(serialized: SerializedEvent): Either<Throwable, E> =
     codec.deserialize(serialized.unwrap)
 }
+
+fun <T> JsonCodec<T>.toEventCodec(): EventCodec<T> = JsonEventCodec(this)

@@ -88,9 +88,9 @@ private object Env {
   }
 
   val summaryGenerator = object : SummaryGenerator<MockSummary> {
-    override val empty: MockSummary = MockSummary()
+    override val emptySummary: MockSummary = MockSummary()
 
-    override fun generate(
+    override fun generateSummary(
       prevSummary: MockSummary,
       event: SerializedEvent,
     ): Either<SummaryAggregationFailure, MockSummary> = (prevSummary + event).right()

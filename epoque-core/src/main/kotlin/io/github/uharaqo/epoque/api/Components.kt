@@ -12,14 +12,14 @@ interface EventSerializable<E : Any> {
   val eventCodecRegistry: EventCodecRegistry
 
   fun serialize(
-    prevVersion: Version,
+    currentVersion: Version,
     events: List<E>,
   ): Either<EventSerializationFailure, List<VersionedEvent>> = either {
     events.withIndex().map { (i, e) ->
-      val version = prevVersion + (i + 1)
+      val version = currentVersion + (i + 1)
 
       val eventType = EventType.of(e::class.java)
-      val codec = eventCodecRegistry.find<E>(eventType)
+      val codec = eventCodecRegistry.get<E>(eventType)
       val serialized =
         codec
           ?.serialize(e)
@@ -37,15 +37,17 @@ interface EventWritable<E : Any> : EventSerializable<E> {
 
   suspend fun write(
     journalKey: JournalKey,
-    prevVersion: Version,
+    currentVersion: Version,
     events: List<E>,
     tx: TransactionContext,
-  ): Either<EventWriteFailure, Unit> = either {
+  ): Either<EventWriteFailure, List<VersionedEvent>> = either {
     val versionedEvents =
-      serialize(prevVersion, events)
+      serialize(currentVersion, events)
         .mapLeft { EventWriteFailure("Failed to serialize event", it) }.bind()
 
     eventWriter.write(journalKey, versionedEvents, tx).bind()
+
+    versionedEvents
   }
 }
 
@@ -57,7 +59,7 @@ interface SummaryAggregatable<S> {
     cachedSummary: VersionedSummary<S>?,
   ): Either<SummaryAggregationFailure, VersionedSummary<S>> = either {
     var currentVersion = (cachedSummary?.version ?: Version.ZERO).unwrap
-    val initialSummary = cachedSummary?.summary ?: summaryGenerator.empty
+    val initialSummary = cachedSummary?.summary ?: summaryGenerator.emptySummary
 
     val summary = events.fold(initialSummary) { prevSummary, ve ->
       currentVersion += 1
@@ -66,7 +68,7 @@ interface SummaryAggregatable<S> {
         SummaryAggregationFailure("Event version mismatch. prev: ${currentVersion - 1}, received: ${ve.version}: ${ve.type}")
       }
 
-      summaryGenerator.generate(prevSummary, ve.event).bind()
+      summaryGenerator.generateSummary(prevSummary, ve.event).bind()
     }
 
     VersionedSummary(Version(currentVersion), summary)
