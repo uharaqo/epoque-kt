@@ -1,13 +1,16 @@
 package io.github.uharaqo.epoque.impl
 
 import arrow.core.Either
+import arrow.core.raise.either
 import arrow.core.right
 import io.github.uharaqo.epoque.api.CommandHandler
 import io.github.uharaqo.epoque.api.EpoqueException
 import io.github.uharaqo.epoque.api.EpoqueException.CommandHandlerFailure
+import io.github.uharaqo.epoque.api.EpoqueException.EventHandlerFailure
 import io.github.uharaqo.epoque.api.EpoqueException.EventLoadFailure
 import io.github.uharaqo.epoque.api.EpoqueException.EventWriteFailure
 import io.github.uharaqo.epoque.api.EpoqueException.SummaryAggregationFailure
+import io.github.uharaqo.epoque.api.EventHandler
 import io.github.uharaqo.epoque.api.EventHandlerExecutor
 import io.github.uharaqo.epoque.api.EventLoader
 import io.github.uharaqo.epoque.api.EventType
@@ -26,10 +29,10 @@ import kotlinx.coroutines.flow.asFlow
 import kotlinx.serialization.Serializable
 
 abstract class TestEnvironment {
-  val journalKey = JournalKey(JournalGroupId("foo"), JournalId("bar"))
-  val eventType = EventType(TestEvent.ResourceCreated::class.qualifiedName!!)
-  val dummyEvent1 = SerializedEvent(SerializedJson("""{"id": 1}"""))
-  val dummyEvent2 = SerializedEvent(SerializedJson("""{"id": 1}"""))
+  val dummyJournalKey = JournalKey(JournalGroupId("foo"), JournalId("bar"))
+  val resourceCreatedEventType = EventType(TestEvent.ResourceCreated::class.qualifiedName!!)
+  val serializedEvent1 = SerializedEvent(SerializedJson("""{"name":"1"}"""))
+  val serializedEvent2 = SerializedEvent(SerializedJson("""{"name":"2"}"""))
 
   val dummyEventCodecRegistry =
     EventCodecRegistryBuilder<TestEvent>().register<TestEvent.ResourceCreated>().build()
@@ -44,9 +47,10 @@ abstract class TestEnvironment {
     ): Either<SummaryAggregationFailure, MockSummary> = (prevSummary + event).right()
   }
 
+  val dummyEvents = listOf(TestEvent.ResourceCreated("1"), TestEvent.ResourceCreated("2"))
   val dummyRecords = listOf(
-    VersionedEvent(Version(1), eventType, dummyEvent1),
-    VersionedEvent(Version(2), eventType, dummyEvent2),
+    VersionedEvent(Version(1), resourceCreatedEventType, serializedEvent1),
+    VersionedEvent(Version(2), resourceCreatedEventType, serializedEvent2),
   )
 
   val dummyEventLoader = object : EventLoader {
@@ -79,14 +83,41 @@ abstract class TestEnvironment {
     override fun handle(
       command: TestCommand,
       summary: MockSummary,
-    ): Either<CommandHandlerFailure, List<TestEvent>> =
-      listOf(TestEvent.ResourceCreated("1"), TestEvent.ResourceCreated("2")).right()
+    ): Either<CommandHandlerFailure, List<TestEvent>> = dummyEvents.right()
   }
 
   val dummyCommandCodecRegistry =
     CommandCodecRegistryBuilder<TestCommand>()
       .register<TestCommand.Create>()
       .build()
+
+  val dummyEventHandler = object : EventHandler<TestSummary, TestEvent> {
+    override fun handle(
+      summary: TestSummary,
+      event: TestEvent,
+    ): Either<EventHandlerFailure, TestSummary> = either {
+      if (summary !is TestSummary.Default) {
+        TestSummary.Default(listOf(event))
+      } else {
+        summary.copy(summary.list + event)
+      }
+    }
+  }
+
+  val dummyEventHandlerRegistry =
+    DefaultEventHandlerRegistry(
+      DefaultRegistryBuilder<EventType, EventHandler<TestSummary, TestEvent>>().apply {
+        register(resourceCreatedEventType, dummyEventHandler)
+      }.build(),
+    )
+
+  val dummyJournal = Journal(
+    dummyJournalKey.groupId,
+    TestEvent::class,
+    TestSummary.Empty,
+    dummyEventHandlerRegistry,
+    dummyEventCodecRegistry,
+  )
 
   sealed interface TestCommand {
     @Serializable
@@ -98,8 +129,24 @@ abstract class TestEnvironment {
     data class ResourceCreated(val name: String) : TestEvent
   }
 
+  sealed interface TestSummary {
+    data object Empty : TestSummary
+    data class Default(val list: List<TestEvent>) : TestSummary
+  }
+
   data class MockSummary(val list: List<SerializedEvent> = emptyList())
 
   operator fun MockSummary.plus(event: SerializedEvent): MockSummary =
     this.copy(list = list + event)
+
+  fun dummyCommandExecutor(eventWriter: EventWriter) =
+    CommandExecutor(
+      dummyJournalKey.groupId,
+      dummyCommandHandler,
+      dummyEventCodecRegistry,
+      dummyEventHandlerExecutor,
+      dummyEventLoader,
+      eventWriter,
+      dummyTransactionStarter,
+    )
 }

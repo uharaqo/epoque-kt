@@ -1,6 +1,10 @@
 package io.github.uharaqo.epoque.api
 
 import arrow.core.Either
+import io.github.uharaqo.epoque.api.EpoqueException.CommandDeserializationFailure
+import io.github.uharaqo.epoque.api.EpoqueException.CommandSerializationFailure
+import io.github.uharaqo.epoque.api.EpoqueException.EventDeserializationFailure
+import io.github.uharaqo.epoque.api.EpoqueException.EventSerializationFailure
 import io.github.uharaqo.epoque.api.EpoqueException.UnexpectedCommand
 import io.github.uharaqo.epoque.api.EpoqueException.UnexpectedEvent
 
@@ -19,7 +23,7 @@ interface DataDeserializer<V, W> {
 interface DataCodec<V, W> : DataSerializer<V, W>, DataDeserializer<V, W>
 
 @JvmInline
-value class SerializedEvent(val unwrap: SerializedData) : SerializedData by unwrap {
+value class SerializedEvent(val unwrap: SerializedData) {
   override fun toString(): String = unwrap.toString()
 }
 
@@ -40,11 +44,13 @@ interface EventDeserializer<E> : DataDeserializer<E, SerializedEvent>
 value class EventCodec<E>(
   private val codec: DataCodec<E, SerializedData>,
 ) : DataCodec<E, SerializedEvent>, EventSerializer<E>, EventDeserializer<E> {
-  override fun serialize(value: E): Either<Throwable, SerializedEvent> =
+  override fun serialize(value: E): Either<EventSerializationFailure, SerializedEvent> =
     codec.serialize(value).map(::SerializedEvent)
+      .mapLeft { EventSerializationFailure("Failed to serialize event", it) }
 
-  override fun deserialize(serialized: SerializedEvent): Either<Throwable, E> =
-    codec.deserialize(serialized)
+  override fun deserialize(serialized: SerializedEvent): Either<EventDeserializationFailure, E> =
+    codec.deserialize(serialized.unwrap)
+      .mapLeft { EventDeserializationFailure("Failed to deserialize event", it) }
 }
 
 fun <E> DataCodec<E, SerializedData>.toEventCodec(): EventCodec<E> = EventCodec(this)
@@ -54,7 +60,7 @@ fun interface EventCodecRegistry<E> {
 }
 
 @JvmInline
-value class SerializedCommand(val unwrap: SerializedData) : SerializedData by unwrap {
+value class SerializedCommand(val unwrap: SerializedData) {
   override fun toString(): String = unwrap.toString()
 }
 
@@ -75,11 +81,13 @@ interface CommandDeserializer<E> : DataDeserializer<E, SerializedCommand>
 value class CommandCodec<C>(
   private val codec: DataCodec<C, SerializedData>,
 ) : DataCodec<C, SerializedCommand>, CommandSerializer<C>, CommandDeserializer<C> {
-  override fun serialize(value: C): Either<Throwable, SerializedCommand> =
+  override fun serialize(value: C): Either<CommandSerializationFailure, SerializedCommand> =
     codec.serialize(value).map(::SerializedCommand)
+      .mapLeft { CommandSerializationFailure("Failed to serialize command", it) }
 
-  override fun deserialize(serialized: SerializedCommand): Either<Throwable, C> =
-    codec.deserialize(serialized)
+  override fun deserialize(serialized: SerializedCommand): Either<CommandDeserializationFailure, C> =
+    codec.deserialize(serialized.unwrap)
+      .mapLeft { CommandDeserializationFailure("Failed to deserialize command", it) }
 }
 
 fun <C> DataCodec<C, SerializedData>.toCommandCodec(): CommandCodec<C> = CommandCodec(this)

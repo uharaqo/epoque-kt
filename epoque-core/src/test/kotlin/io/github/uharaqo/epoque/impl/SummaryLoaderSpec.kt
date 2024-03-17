@@ -24,25 +24,25 @@ class SummaryLoaderSpec : StringSpec(
     "EventLoader and SummaryGenerator work as SummaryLoadable" {
       val summary =
         newSummaryLoader().loadSummary(
-          journalKey = journalKey,
+          journalKey = dummyJournalKey,
           tx = mockk(),
         ).getOrElse { throw it }
 
       summary.version shouldBe Version(2)
-      summary.summary.list shouldBe listOf(dummyEvent1, dummyEvent2)
+      summary.summary.list shouldBe listOf(serializedEvent1, serializedEvent2)
     }
 
     "SummaryLoadable works with cached summary" {
-      val cachedSummary = VersionedSummary(Version(1), MockSummary(listOf(dummyEvent1)))
+      val cachedSummary = VersionedSummary(Version(1), MockSummary(listOf(serializedEvent1)))
       val summary =
         newSummaryLoader().loadSummary(
-          journalKey = journalKey,
+          journalKey = dummyJournalKey,
           tx = mockk(),
           cachedSummary = cachedSummary,
         ).getOrElse { throw it }
 
       summary.version shouldBe Version(2)
-      summary.summary.list shouldBe listOf(dummyEvent1, dummyEvent2)
+      summary.summary.list shouldBe listOf(serializedEvent1, serializedEvent2)
     }
 
     "SummaryLoadable fails on version mismatch" {
@@ -52,12 +52,12 @@ class SummaryLoaderSpec : StringSpec(
           prevVersion: Version,
           tx: TransactionContext,
         ): Either<EventLoadFailure, Flow<VersionedEvent>> =
-          flowOf(VersionedEvent(Version(2), eventType, dummyEvent2)).right()
+          flowOf(VersionedEvent(Version(2), resourceCreatedEventType, serializedEvent2)).right()
       }
 
-      shouldThrowMessage("Event version mismatch. prev: 0, received: 2: $eventType") {
+      shouldThrowMessage("Event version mismatch. prev: 0, received: 2: $resourceCreatedEventType") {
         newSummaryLoader(dummyEventLoader).loadSummary(
-          journalKey = journalKey,
+          journalKey = dummyJournalKey,
           tx = mockk(),
           cachedSummary = null,
         ).getOrElse { throw it }

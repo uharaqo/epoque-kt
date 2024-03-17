@@ -31,7 +31,7 @@ class CommandRouterSpec : StringSpec(
       val input = CommandInput(
         id = JournalId("JID_1"),
         type = CommandType.of<TestCommand.Create>(),
-        payload = SerializedCommand(SerializedJson("""{"name":"Foo"}""")),
+        payload = SerializedCommand(SerializedJson("""{"name":"Whatever"}""")),
       )
       val out = commandRouter.process(input)
 
