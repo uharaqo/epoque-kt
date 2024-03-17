@@ -138,4 +138,15 @@ abstract class TestEnvironment {
 
   operator fun MockSummary.plus(event: SerializedEvent): MockSummary =
     this.copy(list = list + event)
+
+  fun dummyCommandExecutor(eventWriter: EventWriter) =
+    CommandExecutor(
+      dummyJournalKey.groupId,
+      dummyCommandHandler,
+      dummyEventCodecRegistry,
+      dummyEventHandlerExecutor,
+      dummyEventLoader,
+      eventWriter,
+      dummyTransactionStarter,
+    )
 }
