@@ -56,3 +56,27 @@ data class VersionedSummary<S>(
   val version: Version,
   val summary: S,
 )
+
+@JvmInline
+value class SerializedCommand(val unwrap: SerializedData) {
+  override fun toString(): String = unwrap.toString()
+}
+
+@JvmInline
+value class CommandType(val unwrap: String) {
+  override fun toString(): String = unwrap
+
+  companion object {
+    inline fun <reified C : Any> of(): CommandType = CommandType(C::class.java.canonicalName!!)
+  }
+}
+
+data class CommandInput(
+  val id: JournalId,
+  val type: CommandType,
+  val payload: SerializedCommand,
+)
+
+data class CommandOutput(
+  val events: List<VersionedEvent>,
+)

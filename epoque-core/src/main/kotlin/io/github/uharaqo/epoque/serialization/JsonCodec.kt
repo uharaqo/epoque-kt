@@ -1,7 +1,9 @@
 package io.github.uharaqo.epoque.serialization
 
 import arrow.core.Either
+import io.github.uharaqo.epoque.api.CommandCodec
 import io.github.uharaqo.epoque.api.EventCodec
+import io.github.uharaqo.epoque.api.SerializedCommand
 import io.github.uharaqo.epoque.api.SerializedData
 import io.github.uharaqo.epoque.api.SerializedEvent
 import kotlinx.serialization.KSerializer
@@ -41,3 +43,14 @@ value class JsonEventCodec<E>(private val codec: JsonCodec<E>) : EventCodec<E> {
 }
 
 fun <T> JsonCodec<T>.toEventCodec(): EventCodec<T> = JsonEventCodec(this)
+
+@JvmInline
+value class JsonCommandCodec<E>(private val codec: JsonCodec<E>) : CommandCodec<E> {
+  override fun serialize(value: E): Either<Throwable, SerializedCommand> =
+    codec.serialize(value).map { SerializedCommand(it) }
+
+  override fun deserialize(serialized: SerializedCommand): Either<Throwable, E> =
+    codec.deserialize(serialized.unwrap)
+}
+
+fun <T> JsonCodec<T>.toCommandCodec(): CommandCodec<T> = JsonCommandCodec(this)

@@ -2,9 +2,8 @@ package io.github.uharaqo.epoque.api
 
 import arrow.core.getOrElse
 import arrow.core.right
-import io.github.uharaqo.epoque.TestEvent
-import io.github.uharaqo.epoque.TestEvent.ResourceCreated
-import io.github.uharaqo.epoque.builder.EventCodecRegistryBuilder
+import io.github.uharaqo.epoque.api.TestEnvironment.TestEvent
+import io.github.uharaqo.epoque.api.TestEnvironment.TestEvent.ResourceCreated
 import io.github.uharaqo.epoque.serialization.JsonCodec
 import io.github.uharaqo.epoque.serialization.SerializedJson
 import io.github.uharaqo.epoque.serialization.toEventCodec
@@ -30,14 +29,9 @@ class EventWritableSpec : StringSpec(
       val eventWriter = mockk<EventWriter>()
       val tx = mockk<TransactionContext>()
 
-      val registry =
-        EventCodecRegistryBuilder<TestEvent>()
-          .register<ResourceCreated>()
-          .build()
-
       val eventWritable = object : EventWritable<TestEvent> {
         override val eventWriter = eventWriter
-        override val eventCodecRegistry = registry
+        override val eventCodecRegistry = dummyEventCodecRegistry
       }
 
       val writtenEvents = slot<List<VersionedEvent>>()
@@ -61,4 +55,6 @@ class EventWritableSpec : StringSpec(
       writtenEvents.captured shouldBe expected
     }
   },
-)
+) {
+  companion object : TestEnvironment()
+}

@@ -22,3 +22,10 @@ interface EventLoader {
     tx: TransactionContext,
   ): Either<EventLoadFailure, Flow<VersionedEvent>>
 }
+
+interface TransactionStarter {
+  suspend fun <T> startTransactionAndLock(
+    journalKey: JournalKey,
+    block: suspend (tx: TransactionContext) -> T,
+  ): Either<EpoqueException, T>
+}
