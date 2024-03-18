@@ -1,14 +1,11 @@
 package io.github.uharaqo.epoque.impl
 
-import arrow.core.Either
-import arrow.core.raise.either
-import arrow.core.raise.ensureNotNull
 import io.github.uharaqo.epoque.api.CanExecuteCommandHandler
 import io.github.uharaqo.epoque.api.CanProcessCommand
 import io.github.uharaqo.epoque.api.CommandCodec
 import io.github.uharaqo.epoque.api.CommandHandler
-import io.github.uharaqo.epoque.api.CommandInput
 import io.github.uharaqo.epoque.api.CommandProcessor
+import io.github.uharaqo.epoque.api.CommandProcessorRegistry
 import io.github.uharaqo.epoque.api.CommandRouter
 import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.EpoqueException.UnexpectedCommand
@@ -19,17 +16,21 @@ import io.github.uharaqo.epoque.api.EventWriter
 import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.api.TransactionStarter
 
-class DefaultCommandRouter(
-  private val map: Map<CommandType, CommandProcessor>,
-) : CommandRouter {
-  override fun get(input: CommandInput): Either<UnexpectedCommand, CommandProcessor> = either {
-    ensureNotNull(map[input.type]) {
-      UnexpectedCommand("Unknown command type: ${input.type}")
-    }
-  }
+class CommandRouterBuilder {
+  private val registry =
+    Registry.builder<CommandType, CommandProcessor, UnexpectedCommand> { UnexpectedCommand("CommandProcessor not found: $it") }
 
-  fun plus(other: DefaultCommandRouter): DefaultCommandRouter =
-    DefaultCommandRouter(this.map + other.map)
+  inline fun <reified C : Any> processorFor(commandProcessor: CommandProcessor): CommandRouterBuilder =
+    register(CommandType.of<C>(), commandProcessor)
+
+  fun register(commandType: CommandType, commandProcessor: CommandProcessor): CommandRouterBuilder =
+    this.also { registry[commandType] = commandProcessor }
+
+  fun build(): CommandRouter = DefaultCommandRouter(CommandProcessorRegistry(registry.build()))
+
+  private inner class DefaultCommandRouter(
+    override val commandProcessorRegistry: CommandProcessorRegistry,
+  ) : CommandRouter
 }
 
 class TypedCommandProcessor<C>(

@@ -10,8 +10,10 @@ import io.github.uharaqo.epoque.api.EpoqueException.EventHandlerFailure
 import io.github.uharaqo.epoque.api.EpoqueException.EventLoadFailure
 import io.github.uharaqo.epoque.api.EpoqueException.EventWriteFailure
 import io.github.uharaqo.epoque.api.EpoqueException.SummaryAggregationFailure
+import io.github.uharaqo.epoque.api.EpoqueException.UnexpectedEvent
 import io.github.uharaqo.epoque.api.EventHandler
 import io.github.uharaqo.epoque.api.EventHandlerExecutor
+import io.github.uharaqo.epoque.api.EventHandlerRegistry
 import io.github.uharaqo.epoque.api.EventLoader
 import io.github.uharaqo.epoque.api.EventType
 import io.github.uharaqo.epoque.api.EventWriter
@@ -105,9 +107,11 @@ abstract class TestEnvironment {
   }
 
   val dummyEventHandlerRegistry =
-    DefaultEventHandlerRegistry(
-      DefaultRegistryBuilder<EventType, EventHandler<TestSummary, TestEvent>>().apply {
-        register(resourceCreatedEventType, dummyEventHandler)
+    EventHandlerRegistry(
+      Registry.builder<EventType, EventHandler<TestSummary, TestEvent>, UnexpectedEvent> {
+        UnexpectedEvent("Unexpected event: $it")
+      }.apply {
+        set(resourceCreatedEventType, dummyEventHandler)
       }.build(),
     )
 

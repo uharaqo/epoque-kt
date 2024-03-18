@@ -22,8 +22,7 @@ class CommandRouterSpec : StringSpec(
       val commandExecutor = mockk<CommandExecutor<TestCommand.Create, *, *>>()
       val commandCodec = JsonCodec.of<TestCommand.Create>().toCommandCodec()
       val processor = TypedCommandProcessor(commandCodec, commandExecutor)
-      val commandRouter =
-        DefaultCommandRouter(mapOf(CommandType.of<TestCommand.Create>() to processor))
+      val commandRouter = CommandRouterBuilder().processorFor<TestCommand.Create>(processor).build()
 
       coEvery { commandExecutor.execute(any(), any()) } returns CommandOutput(dummyRecords).right()
 

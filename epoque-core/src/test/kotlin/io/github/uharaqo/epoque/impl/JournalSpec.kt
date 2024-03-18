@@ -10,6 +10,7 @@ import io.github.uharaqo.epoque.api.EventWriter
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
 import io.github.uharaqo.epoque.api.VersionedSummary
+import io.github.uharaqo.epoque.impl.TestEnvironment.TestCommand
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestSummary
 import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.core.spec.style.StringSpec
@@ -41,14 +42,14 @@ class JournalSpec : StringSpec(
       coEvery { eventWriter.write(any(), capture(slot), any()) } returns Unit.right()
 
       val commandExecutor = dummyCommandExecutor(eventWriter)
-      val commandType = CommandType.of<TestEnvironment.TestCommand.Create>()
+      val commandType = CommandType.of<TestCommand.Create>()
       val commandCodec = dummyCommandCodecRegistry.find(commandType).rethrow()
       val testProcessor = TypedCommandProcessor(commandCodec, commandExecutor)
-      val commandProcessors = mapOf(commandType to testProcessor)
-      val processor: CommandProcessor = DefaultCommandRouter(commandProcessors)
+      val processor: CommandProcessor =
+        CommandRouterBuilder().processorFor<TestCommand.Create>(testProcessor).build()
 
       // when
-      val command = TestEnvironment.TestCommand.Create("Integration")
+      val command = TestCommand.Create("Integration")
       val serialized = commandCodec.serialize(command).rethrow()
       val output =
         processor.process(CommandInput(dummyJournalKey.id, commandType, serialized)).rethrow()
