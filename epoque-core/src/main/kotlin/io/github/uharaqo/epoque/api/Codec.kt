@@ -7,6 +7,7 @@ import io.github.uharaqo.epoque.api.EpoqueException.EventDeserializationFailure
 import io.github.uharaqo.epoque.api.EpoqueException.EventSerializationFailure
 import io.github.uharaqo.epoque.api.EpoqueException.UnexpectedCommand
 import io.github.uharaqo.epoque.api.EpoqueException.UnexpectedEvent
+import io.github.uharaqo.epoque.impl.Registry
 
 interface SerializedData {
   fun toText(): String
@@ -55,9 +56,10 @@ value class EventCodec<E>(
 
 fun <E> DataCodec<E, SerializedData>.toEventCodec(): EventCodec<E> = EventCodec(this)
 
-fun interface EventCodecRegistry<E> {
-  fun find(eventType: EventType): Either<UnexpectedEvent, EventCodec<E>>
-}
+@JvmInline
+value class EventCodecRegistry<E>(
+  private val registry: Registry<EventType, EventCodec<E>, UnexpectedEvent>,
+) : Registry<EventType, EventCodec<E>, UnexpectedEvent> by registry
 
 @JvmInline
 value class SerializedCommand(val unwrap: SerializedData) {
@@ -92,6 +94,7 @@ value class CommandCodec<C>(
 
 fun <C> DataCodec<C, SerializedData>.toCommandCodec(): CommandCodec<C> = CommandCodec(this)
 
-fun interface CommandCodecRegistry<C> {
-  fun find(commandType: CommandType): Either<UnexpectedCommand, CommandCodec<C>>
-}
+@JvmInline
+value class CommandCodecRegistry<C>(
+  private val registry: Registry<CommandType, CommandCodec<C>, UnexpectedCommand>,
+) : Registry<CommandType, CommandCodec<C>, UnexpectedCommand> by registry

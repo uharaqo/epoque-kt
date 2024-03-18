@@ -1,33 +1,46 @@
 package io.github.uharaqo.epoque.impl
 
-interface Registry<K : Any, V : Any> {
-  operator fun get(key: K): V?
+import arrow.core.Either
+import arrow.core.raise.either
+import arrow.core.raise.ensureNotNull
+import io.github.uharaqo.epoque.api.EpoqueException
+import java.util.*
+import java.util.concurrent.atomic.AtomicBoolean
 
-  fun toMap(): Map<K, V>
+interface Registry<K, V, ERR : EpoqueException> {
+  fun find(key: K): Either<ERR, V>
+
+  companion object
 }
 
-@JvmInline
-value class DefaultRegistry<K : Any, V : Any>(private val map: Map<K, V>) : Registry<K, V> {
-  override operator fun get(key: K): V? = map[key]
+fun <K : Any, V : Any, ERR : EpoqueException> Registry.Companion.builder(
+  onError: (K) -> ERR,
+): RegistryBuilder<K, V, ERR> = RegistryBuilder(onError)
 
-  override fun toMap(): Map<K, V> = map
-
-  operator fun plus(other: DefaultRegistry<K, V>): DefaultRegistry<K, V> =
-    DefaultRegistry(this.toMap() + other.toMap())
-}
-
-interface RegistryBuilder<K : Any, V : Any> {
-  fun register(key: K, value: V)
-
-  fun build(): Registry<K, V>
-}
-
-class DefaultRegistryBuilder<K : Any, V : Any> : RegistryBuilder<K, V> {
+class RegistryBuilder<K : Any, V : Any, ERR : EpoqueException>(
+  private val onError: (K) -> ERR,
+) {
+  private val built = AtomicBoolean(false)
   private val map = mutableMapOf<K, V>()
 
-  override fun register(key: K, value: V) {
-    map[key] = value
+  operator fun set(key: K, value: V): Unit = synchronized(this) {
+    check(!built.get()) { "Registry is already built" }
+    checkNotNull(map.computeIfAbsent(key) { value }) { "The key: $key is already registered" }
   }
 
-  override fun build(): Registry<K, V> = DefaultRegistry(map)
+  fun build(): Registry<K, V, ERR> = synchronized(this) {
+    built.set(true)
+    DefaultRegistry(map, onError)
+  }
+
+  private inner class DefaultRegistry(
+    map: Map<K, V>,
+    private val onError: (K) -> ERR,
+  ) : Registry<K, V, ERR> {
+    private val map = Collections.unmodifiableMap(map)
+
+    override fun find(key: K): Either<ERR, V> = either {
+      ensureNotNull(map[key]) { onError(key) }
+    }
+  }
 }
