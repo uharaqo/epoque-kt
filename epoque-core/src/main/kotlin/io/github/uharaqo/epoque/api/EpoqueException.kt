@@ -10,6 +10,8 @@ sealed class EpoqueException(msg: String, t: Throwable?) : RuntimeException(msg,
 
   class EventWriteFailure(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
 
+  class EventWriteConflict(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
+
   class EventLoadFailure(msg: String, t: Throwable? = null) : EpoqueException(msg, t)
 
   class EventHandlerFailure(msg: String, t: Throwable? = null) : EpoqueException(msg, t)

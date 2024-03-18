@@ -61,7 +61,7 @@ class EventWriterSpec : StringSpec(
       }
 
       val writtenEvents = slot<List<VersionedEvent>>()
-      coEvery { eventWriter.write(any(), capture(writtenEvents), any()) } returns Unit.right()
+      coEvery { eventWriter.writeEvents(any(), capture(writtenEvents), any()) } returns Unit.right()
 
       canWriteEvents.writeEvents(
         journalKey = dummyJournalKey,

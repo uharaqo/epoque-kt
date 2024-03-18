@@ -3,6 +3,7 @@ package io.github.uharaqo.epoque.impl
 import arrow.core.Either
 import arrow.core.raise.either
 import arrow.core.right
+import io.github.uharaqo.epoque.api.CommandExecutorOptions
 import io.github.uharaqo.epoque.api.CommandHandler
 import io.github.uharaqo.epoque.api.EpoqueException
 import io.github.uharaqo.epoque.api.EpoqueException.CommandHandlerFailure
@@ -20,6 +21,7 @@ import io.github.uharaqo.epoque.api.EventWriter
 import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
+import io.github.uharaqo.epoque.api.LockOption
 import io.github.uharaqo.epoque.api.SerializedEvent
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.TransactionStarter
@@ -65,20 +67,27 @@ abstract class TestEnvironment {
   }
 
   val dummyEventWriter = object : EventWriter {
-    override suspend fun write(
+    override suspend fun writeEvents(
       journalKey: JournalKey,
       events: List<VersionedEvent>,
       tx: TransactionContext,
     ): Either<EventWriteFailure, Unit> = Unit.right()
   }
 
-  val dummyTransactionContext = object : TransactionContext {}
+  val dummyTransactionContext = object : TransactionContext {
+    override val lockOption: LockOption = LockOption.DEFAULT
+    override val lockedKeys: Set<JournalKey> = emptySet()
+  }
 
   val dummyTransactionStarter = object : TransactionStarter {
     override suspend fun <T> startTransactionAndLock(
-      journalKey: JournalKey,
+      key: JournalKey,
+      lockOption: LockOption,
       block: suspend (tx: TransactionContext) -> T,
     ): Either<EpoqueException, T> = block(dummyTransactionContext).right()
+
+    override suspend fun <T> startDefaultTransaction(block: suspend (tx: TransactionContext) -> T): Either<EpoqueException, T> =
+      block(dummyTransactionContext).right()
   }
 
   val dummyCommandHandler = object : CommandHandler<TestCommand, MockSummary, TestEvent> {
@@ -143,7 +152,10 @@ abstract class TestEnvironment {
   operator fun MockSummary.plus(event: SerializedEvent): MockSummary =
     this.copy(list = list + event)
 
-  fun dummyCommandExecutor(eventWriter: EventWriter) =
+  fun dummyCommandExecutor(
+    eventWriter: EventWriter,
+    defaultCommandExecutorOptions: CommandExecutorOptions? = null,
+  ) =
     CommandExecutor(
       dummyJournalKey.groupId,
       dummyCommandHandler,
@@ -152,5 +164,6 @@ abstract class TestEnvironment {
       dummyEventLoader,
       eventWriter,
       dummyTransactionStarter,
+      defaultCommandExecutorOptions,
     )
 }
