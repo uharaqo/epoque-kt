@@ -10,7 +10,7 @@ import kotlinx.serialization.serializer
 @JvmInline
 value class SerializedJson(private val unwrap: String) : SerializedData {
   override fun toText(): String = unwrap
-
+  override fun toByteArray(): ByteArray = toText().toByteArray()
   override fun toString(): String = toText()
 }
 

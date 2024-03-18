@@ -41,8 +41,16 @@ data class CommandInput(
   val id: JournalId,
   val type: CommandType,
   val payload: SerializedCommand,
+  val commandExecutorOptions: CommandExecutorOptions? = null,
 )
 
 data class CommandOutput(
   val events: List<VersionedEvent>,
 )
+
+data class CommandExecutorOptions(
+  val timeoutMillis: Long = 5000L,
+  val lockOption: LockOption = LockOption.DEFAULT,
+) : EpoqueContextValue {
+  object Key : EpoqueContextKey<CommandExecutorOptions>
+}

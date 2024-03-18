@@ -3,6 +3,7 @@ package io.github.uharaqo.epoque.impl
 import io.github.uharaqo.epoque.api.CanExecuteCommandHandler
 import io.github.uharaqo.epoque.api.CanProcessCommand
 import io.github.uharaqo.epoque.api.CommandCodec
+import io.github.uharaqo.epoque.api.CommandExecutorOptions
 import io.github.uharaqo.epoque.api.CommandHandler
 import io.github.uharaqo.epoque.api.CommandProcessor
 import io.github.uharaqo.epoque.api.CommandProcessorRegistry
@@ -46,4 +47,5 @@ class CommandExecutor<C, S, E : Any>(
   override val eventLoader: EventLoader,
   override val eventWriter: EventWriter,
   transactionStarter: TransactionStarter,
+  override val defaultCommandExecutorOptions: CommandExecutorOptions?,
 ) : CanExecuteCommandHandler<C, S, E>, TransactionStarter by transactionStarter

@@ -11,6 +11,7 @@ import io.github.uharaqo.epoque.impl.Registry
 
 interface SerializedData {
   fun toText(): String
+  fun toByteArray(): ByteArray
 }
 
 interface DataSerializer<V, W> {
@@ -29,7 +30,7 @@ value class SerializedEvent(val unwrap: SerializedData) {
 }
 
 @JvmInline
-value class EventType(private val unwrap: String) {
+value class EventType(val unwrap: String) {
   override fun toString(): String = unwrap
 
   companion object {

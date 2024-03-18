@@ -39,7 +39,7 @@ class JournalSpec : StringSpec(
       // given
       val eventWriter = mockk<EventWriter>()
       val slot = slot<List<VersionedEvent>>()
-      coEvery { eventWriter.write(any(), capture(slot), any()) } returns Unit.right()
+      coEvery { eventWriter.writeEvents(any(), capture(slot), any()) } returns Unit.right()
 
       val commandExecutor = dummyCommandExecutor(eventWriter)
       val commandType = CommandType.of<TestCommand.Create>()

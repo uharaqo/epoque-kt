@@ -19,9 +19,9 @@ class CommandExecutorSpec : StringSpec(
       // given
       val eventWriter = mockk<EventWriter>()
       val slot = slot<List<VersionedEvent>>()
-      coEvery { eventWriter.write(any(), capture(slot), any()) } returns Unit.right()
+      coEvery { eventWriter.writeEvents(any(), capture(slot), any()) } returns Unit.right()
 
-      val dummyCommandExecutor = dummyCommandExecutor(eventWriter = eventWriter)
+      val dummyCommandExecutor = dummyCommandExecutor(eventWriter)
 
       // when
       val output = dummyCommandExecutor.execute(dummyJournalKey.id, Create("Whatever")).rethrow()
