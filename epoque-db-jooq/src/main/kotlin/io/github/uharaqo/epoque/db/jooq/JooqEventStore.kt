@@ -15,12 +15,12 @@ import io.github.uharaqo.epoque.api.LockOption
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import org.jooq.DSLContext
 import org.jooq.exception.IntegrityConstraintViolationException
 import org.jooq.kotlin.coroutines.transactionCoroutine
-import kotlin.coroutines.coroutineContext
 
 class JooqEventStore<D>(
   private val originalContext: DSLContext,
