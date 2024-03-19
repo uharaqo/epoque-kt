@@ -14,8 +14,8 @@ class EpoqueContext private constructor(
   override val key = Key
 
   @Suppress("UNCHECKED_CAST")
-  operator fun <T : EpoqueContextValue> get(key: EpoqueContextKey<T>): T? =
-    map[key]?.let { it as T }
+  operator fun <V : EpoqueContextValue> get(key: EpoqueContextKey<V>): V? =
+    map[key]?.let { it as V }
 
   fun <V : EpoqueContextValue> with(key: EpoqueContextKey<V>, value: V): EpoqueContext =
     EpoqueContext(map + (key to value))
@@ -33,18 +33,17 @@ class EpoqueContext private constructor(
     return kotlinx.coroutines.withContext(context, block)
   }
 
-  object Key : CoroutineContext.Key<EpoqueContext>
+  object Key : CoroutineContext.Key<EpoqueContext> {
+    suspend fun get(): EpoqueContext = coroutineContext[this]!!
+  }
 
   companion object {
     fun create(): EpoqueContext = EpoqueContext(emptyMap())
   }
 }
 
-fun <T : EpoqueContextValue> CoroutineContext.getEpoqueContext(key: EpoqueContextKey<T>): T? =
-  this[EpoqueContext.Key]?.let { it[key] }
-
-interface EpoqueContextKey<out T : EpoqueContextValue> {
-  suspend fun get(): T? = coroutineContext.getEpoqueContext(this)
+interface EpoqueContextKey<out V : EpoqueContextValue> {
+  suspend fun get(): V? = coroutineContext[EpoqueContext.Key]?.let { it[this] }
 }
 
 interface EpoqueContextValue

@@ -1,5 +1,6 @@
 package io.github.uharaqo.epoque.impl
 
+import io.github.uharaqo.epoque.api.CallbackHandler
 import io.github.uharaqo.epoque.api.CanExecuteCommandHandler
 import io.github.uharaqo.epoque.api.CanProcessCommand
 import io.github.uharaqo.epoque.api.CommandCodec
@@ -12,7 +13,8 @@ import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_NOT_SUPPORTED
 import io.github.uharaqo.epoque.api.EventCodecRegistry
 import io.github.uharaqo.epoque.api.EventHandlerExecutor
-import io.github.uharaqo.epoque.api.EventStore
+import io.github.uharaqo.epoque.api.EventLoader
+import io.github.uharaqo.epoque.api.EventWriter
 import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.api.TransactionStarter
 
@@ -43,9 +45,9 @@ class CommandExecutor<C, S, E : Any>(
   override val commandHandler: CommandHandler<C, S, E>,
   override val eventCodecRegistry: EventCodecRegistry<E>,
   override val eventHandlerExecutor: EventHandlerExecutor<S>,
-  eventStore: EventStore,
+  override val eventLoader: EventLoader,
+  override val eventWriter: EventWriter,
+  transactionStarter: TransactionStarter,
   override val defaultCommandExecutorOptions: CommandExecutorOptions?,
-) : CanExecuteCommandHandler<C, S, E>, TransactionStarter by eventStore {
-  override val eventLoader = eventStore
-  override val eventWriter = eventStore
-}
+  override val callbackHandler: CallbackHandler?,
+) : CanExecuteCommandHandler<C, S, E>, TransactionStarter by transactionStarter

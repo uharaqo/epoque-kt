@@ -126,15 +126,23 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
   val journalGroupId: JournalGroupId
   val commandHandler: CommandHandler<C, S, E>
   val defaultCommandExecutorOptions: CommandExecutorOptions?
+  val callbackHandler: CallbackHandler?
 
   suspend fun execute(command: C, context: CommandContext): Failable<CommandOutput> =
     either {
       catchWithTimeout(context.options.timeoutMillis) {
+        callbackHandler?.beforeBegin(context)
+
         startTransactionAndLock(context.key, context.options.lockOption) { tx ->
+          callbackHandler?.afterBegin(context)
+
           execute(command, commandHandler, context, tx).bind()
+            .also { callbackHandler?.beforeCommit(context, it) }
         }.bind()
       }.bind()
     }
+      .onRight { callbackHandler?.afterCommit(context, it) }
+      .onLeft { callbackHandler?.afterRollback(context, it) }
 
   suspend fun execute(
     command: C,

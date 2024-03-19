@@ -2,11 +2,13 @@ package io.github.uharaqo.epoque.impl
 
 import arrow.core.raise.either
 import arrow.core.right
+import io.github.uharaqo.epoque.api.CallbackHandler
 import io.github.uharaqo.epoque.api.CommandContext
 import io.github.uharaqo.epoque.api.CommandExecutorOptions
 import io.github.uharaqo.epoque.api.CommandHandler
 import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.CommandType
+import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_NOT_SUPPORTED
 import io.github.uharaqo.epoque.api.EventHandler
 import io.github.uharaqo.epoque.api.EventHandlerExecutor
@@ -33,6 +35,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.serialization.Serializable
+import org.slf4j.LoggerFactory
 
 abstract class TestEnvironment {
   val dummyJournalKey = JournalKey(JournalGroupId("foo"), JournalId("bar"))
@@ -142,6 +145,29 @@ abstract class TestEnvironment {
     CommandExecutorOptions(),
   )
 
+  val dummyCallbackHandler = object : CallbackHandler {
+    val log = LoggerFactory.getLogger("TestCallbackHandler")
+    override suspend fun beforeBegin(context: CommandContext) {
+      log.info("> BeforeBegin: $context")
+    }
+
+    override suspend fun afterBegin(context: CommandContext) {
+      log.info("> AfterBegin: $context")
+    }
+
+    override suspend fun beforeCommit(context: CommandContext, output: CommandOutput) {
+      log.info("> BeforeCommit: $context, $output")
+    }
+
+    override suspend fun afterCommit(context: CommandContext, output: CommandOutput) {
+      log.info("> AfterCommit: $context, $output")
+    }
+
+    override suspend fun afterRollback(context: CommandContext, error: Throwable) {
+      log.error("> AfterRollback: $context", error)
+    }
+  }
+
   sealed interface TestCommand {
     @Serializable
     data class Create(val name: String) : TestCommand
@@ -197,17 +223,28 @@ abstract class TestEnvironment {
     return mock
   }
 
+  val dummyEnvironment = EpoqueEnvironment(
+    dummyEventLoader,
+    dummyEventWriter,
+    dummyTransactionStarter,
+    CommandExecutorOptions(),
+    dummyCallbackHandler,
+  )
+
   @Suppress("UNCHECKED_CAST")
   fun dummyCommandExecutor(
     eventWriter: EventWriter? = null,
-    defaultCommandExecutorOptions: CommandExecutorOptions? = null,
-  ) =
-    CommandExecutor(
+  ): CommandExecutor<TestCommand.Create, MockSummary, TestEvent> {
+    return CommandExecutor(
       dummyJournalKey.groupId,
       dummyCommandHandler,
       dummyEventCodecRegistry,
       dummyEventHandlerExecutor,
-      dummyEventStore(eventWriter),
-      defaultCommandExecutorOptions,
+      dummyEnvironment.eventLoader,
+      eventWriter ?: dummyEnvironment.eventWriter,
+      dummyEnvironment.transactionStarter,
+      dummyEnvironment.defaultCommandExecutorOptions,
+      dummyEnvironment.callbackHandler,
     ) as CommandExecutor<TestCommand.Create, MockSummary, TestEvent>
+  }
 }

@@ -62,3 +62,11 @@ data class CommandExecutorOptions(
   val timeoutMillis: Long = 5000L,
   val lockOption: LockOption = LockOption.DEFAULT,
 )
+
+data class EpoqueEnvironment(
+  val eventLoader: EventLoader,
+  val eventWriter: EventWriter,
+  val transactionStarter: TransactionStarter,
+  val defaultCommandExecutorOptions: CommandExecutorOptions?,
+  val callbackHandler: CallbackHandler?,
+)
