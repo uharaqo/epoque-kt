@@ -7,8 +7,11 @@ import arrow.core.raise.either
 import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.EpoqueContext
 import io.github.uharaqo.epoque.api.EpoqueException
-import io.github.uharaqo.epoque.api.EpoqueException.EventLoadFailure
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_READ_FAILURE
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_WRITE_CONFLICT
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_WRITE_FAILURE
 import io.github.uharaqo.epoque.api.EventStore
+import io.github.uharaqo.epoque.api.Failable
 import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.LockOption
 import io.github.uharaqo.epoque.api.TransactionContext
@@ -29,27 +32,27 @@ class JooqEventStore<D>(
     key: JournalKey,
     prevVersion: Version,
     tx: TransactionContext,
-  ): Either<EventLoadFailure, Flow<VersionedEvent>> = either {
+  ): Failable<Flow<VersionedEvent>> = either {
     catch(
       {
         tx.asJooqBlocking {
           queries.selectById(ctx, key, prevVersion)
         }
       },
-    ) { raise(EventLoadFailure("Failed to load events: $key", it)) }
+    ) { raise(EVENT_READ_FAILURE(it)) }
   }
 
   override suspend fun writeEvents(
     output: CommandOutput,
     tx: TransactionContext,
-  ): Either<EpoqueException, Unit> = either {
+  ): Failable<Unit> = either {
     catch(
       {
         tx.asJooq {
           queries.writeEvents(ctx, output.context.key, output.events)
         }
       },
-    ) { raise(it.toEpoqueException(": ${output.context.key}")) }
+    ) { raise(it.toEpoqueException()) }
   }
 
   private suspend fun getTransactionContext() = TransactionContext.Key.get()
@@ -74,7 +77,7 @@ class JooqEventStore<D>(
     }
   }
 
-  override suspend fun <T> startDefaultTransaction(block: suspend (tx: TransactionContext) -> T): Either<EpoqueException, T> =
+  override suspend fun <T> startDefaultTransaction(block: suspend (tx: TransactionContext) -> T): Failable<T> =
     Either.catch {
       getTransactionContext()
         ?.let { block(it) }
@@ -85,7 +88,7 @@ class JooqEventStore<D>(
     key: JournalKey,
     lockOption: LockOption,
     block: suspend (tx: TransactionContext) -> T,
-  ): Either<EpoqueException, T> =
+  ): Failable<T> =
     when (lockOption) {
       LockOption.DEFAULT -> startDefaultTransaction(block)
 
@@ -99,15 +102,13 @@ class JooqEventStore<D>(
         runTransaction(prevCtx, lockOption, locked + key, block) { ctx ->
           queries.lockNextEvent(ctx, key).getOrElse { throw it }
         }
-      }.mapLeft { it.toEpoqueException(": $key") }
+      }.mapLeft { it.toEpoqueException() }
     }
 
-  private fun Throwable.toEpoqueException(trailer: String = ""): EpoqueException =
+  private fun Throwable.toEpoqueException(): EpoqueException =
     when (this) {
-      is IntegrityConstraintViolationException ->
-        EpoqueException.EventWriteConflict("Failed due to conflict$trailer", this)
-
+      is IntegrityConstraintViolationException -> EVENT_WRITE_CONFLICT(this)
       is EpoqueException -> this
-      else -> EpoqueException.EventWriteFailure("Database access error$trailer", this)
+      else -> EVENT_WRITE_FAILURE(this)
     }
 }

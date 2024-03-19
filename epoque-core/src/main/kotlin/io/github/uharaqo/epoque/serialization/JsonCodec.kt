@@ -14,7 +14,10 @@ value class SerializedJson(private val unwrap: String) : SerializedData {
   override fun toString(): String = toText()
 }
 
-class JsonCodec<T>(private val serializer: KSerializer<T>) : DataCodec<T, SerializedData> {
+class JsonCodec<T>(
+  override val type: String,
+  private val serializer: KSerializer<T>,
+) : DataCodec<T, SerializedData> {
 
   override fun serialize(value: T): Either<Throwable, SerializedJson> = Either.catch {
     kotlinx.serialization.json.Json.encodeToString(serializer, value).let(::SerializedJson)
@@ -26,6 +29,7 @@ class JsonCodec<T>(private val serializer: KSerializer<T>) : DataCodec<T, Serial
 
   companion object {
     inline fun <reified T> serializer(): KSerializer<T> = EmptySerializersModule().serializer<T>()
-    inline fun <reified T> of(): JsonCodec<T> = JsonCodec(serializer<T>())
+    inline fun <reified T> of(): JsonCodec<T> =
+      JsonCodec(T::class.java.canonicalName!!, serializer<T>())
   }
 }

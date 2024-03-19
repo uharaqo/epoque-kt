@@ -1,7 +1,6 @@
 package io.github.uharaqo.epoque.db.jooq
 
-import arrow.core.Either
-import io.github.uharaqo.epoque.api.EpoqueException.EventWriteConflict
+import io.github.uharaqo.epoque.api.Failable
 import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.SerializedData
 import io.github.uharaqo.epoque.api.Version
@@ -20,5 +19,5 @@ interface JooqQueries<D> {
 
   suspend fun writeEvents(ctx: DSLContext, key: JournalKey, events: List<VersionedEvent>)
 
-  suspend fun lockNextEvent(ctx: DSLContext, key: JournalKey): Either<EventWriteConflict, Unit>
+  suspend fun lockNextEvent(ctx: DSLContext, key: JournalKey): Failable<Unit>
 }

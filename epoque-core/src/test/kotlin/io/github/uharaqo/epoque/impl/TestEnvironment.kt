@@ -1,6 +1,5 @@
 package io.github.uharaqo.epoque.impl
 
-import arrow.core.Either
 import arrow.core.raise.either
 import arrow.core.right
 import io.github.uharaqo.epoque.api.CommandContext
@@ -8,13 +7,7 @@ import io.github.uharaqo.epoque.api.CommandExecutorOptions
 import io.github.uharaqo.epoque.api.CommandHandler
 import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.CommandType
-import io.github.uharaqo.epoque.api.EpoqueException
-import io.github.uharaqo.epoque.api.EpoqueException.CommandHandlerFailure
-import io.github.uharaqo.epoque.api.EpoqueException.EventHandlerFailure
-import io.github.uharaqo.epoque.api.EpoqueException.EventLoadFailure
-import io.github.uharaqo.epoque.api.EpoqueException.EventWriteFailure
-import io.github.uharaqo.epoque.api.EpoqueException.SummaryAggregationFailure
-import io.github.uharaqo.epoque.api.EpoqueException.UnexpectedEvent
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_NOT_SUPPORTED
 import io.github.uharaqo.epoque.api.EventHandler
 import io.github.uharaqo.epoque.api.EventHandlerExecutor
 import io.github.uharaqo.epoque.api.EventHandlerRegistry
@@ -22,6 +15,7 @@ import io.github.uharaqo.epoque.api.EventLoader
 import io.github.uharaqo.epoque.api.EventStore
 import io.github.uharaqo.epoque.api.EventType
 import io.github.uharaqo.epoque.api.EventWriter
+import io.github.uharaqo.epoque.api.Failable
 import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
@@ -54,7 +48,7 @@ abstract class TestEnvironment {
     override fun handle(
       summary: TestSummary,
       event: TestEvent,
-    ): Either<EventHandlerFailure, TestSummary> = either {
+    ): Failable<TestSummary> = either {
       if (summary !is TestSummary.Default) {
         TestSummary.Default(listOf(event))
       } else {
@@ -70,7 +64,7 @@ abstract class TestEnvironment {
       prevSummary: MockSummary,
       eventType: EventType,
       event: SerializedEvent,
-    ): Either<SummaryAggregationFailure, MockSummary> = (prevSummary + event).right()
+    ): Failable<MockSummary> = (prevSummary + event).right()
   }
 
   val dummyEvents = listOf(TestEvent.ResourceCreated("1"), TestEvent.ResourceCreated("2"))
@@ -84,7 +78,7 @@ abstract class TestEnvironment {
       key: JournalKey,
       prevVersion: Version,
       tx: TransactionContext,
-    ): Either<EventLoadFailure, Flow<VersionedEvent>> =
+    ): Failable<Flow<VersionedEvent>> =
       dummyRecords.asSequence().drop(prevVersion.unwrap.toInt()).asFlow().right()
   }
 
@@ -92,7 +86,7 @@ abstract class TestEnvironment {
     override suspend fun writeEvents(
       output: CommandOutput,
       tx: TransactionContext,
-    ): Either<EventWriteFailure, Unit> = Unit.right()
+    ): Failable<Unit> = Unit.right()
   }
 
   val dummyTransactionContext = object : TransactionContext {
@@ -105,9 +99,9 @@ abstract class TestEnvironment {
       key: JournalKey,
       lockOption: LockOption,
       block: suspend (tx: TransactionContext) -> T,
-    ): Either<EpoqueException, T> = block(dummyTransactionContext).right()
+    ): Failable<T> = block(dummyTransactionContext).right()
 
-    override suspend fun <T> startDefaultTransaction(block: suspend (tx: TransactionContext) -> T): Either<EpoqueException, T> =
+    override suspend fun <T> startDefaultTransaction(block: suspend (tx: TransactionContext) -> T): Failable<T> =
       block(dummyTransactionContext).right()
   }
 
@@ -116,7 +110,7 @@ abstract class TestEnvironment {
     override fun handle(
       command: TestCommand,
       summary: MockSummary,
-    ): Either<CommandHandlerFailure, List<TestEvent>> = dummyEvents.right()
+    ): Failable<List<TestEvent>> = dummyEvents.right()
   }
 
   val dummyCommandCodecRegistry =
@@ -126,8 +120,8 @@ abstract class TestEnvironment {
 
   val dummyEventHandlerRegistry =
     EventHandlerRegistry(
-      Registry.builder<EventType, EventHandler<TestSummary, TestEvent>, UnexpectedEvent> {
-        UnexpectedEvent("Unexpected event: $it")
+      Registry.builder<EventType, EventHandler<TestSummary, TestEvent>> {
+        EVENT_NOT_SUPPORTED(it.toString())
       }.apply {
         set(dummyEventType, dummyEventHandler)
       }.build(),
@@ -173,22 +167,22 @@ abstract class TestEnvironment {
       key: JournalKey,
       prevVersion: Version,
       tx: TransactionContext,
-    ): Either<EventLoadFailure, Flow<VersionedEvent>> =
+    ): Failable<Flow<VersionedEvent>> =
       dummyEventLoader.queryById(key, prevVersion, tx)
 
     override suspend fun writeEvents(
       output: CommandOutput,
       tx: TransactionContext,
-    ): Either<EpoqueException, Unit> = (eventWriter ?: dummyEventWriter).writeEvents(output, tx)
+    ): Failable<Unit> = (eventWriter ?: dummyEventWriter).writeEvents(output, tx)
 
     override suspend fun <T> startTransactionAndLock(
       key: JournalKey,
       lockOption: LockOption,
       block: suspend (tx: TransactionContext) -> T,
-    ): Either<EpoqueException, T> =
+    ): Failable<T> =
       dummyTransactionStarter.startTransactionAndLock(key, lockOption, block)
 
-    override suspend fun <T> startDefaultTransaction(block: suspend (tx: TransactionContext) -> T): Either<EpoqueException, T> =
+    override suspend fun <T> startDefaultTransaction(block: suspend (tx: TransactionContext) -> T): Failable<T> =
       dummyTransactionStarter.startDefaultTransaction(block)
   }
 
@@ -203,6 +197,7 @@ abstract class TestEnvironment {
     return mock
   }
 
+  @Suppress("UNCHECKED_CAST")
   fun dummyCommandExecutor(
     eventWriter: EventWriter? = null,
     defaultCommandExecutorOptions: CommandExecutorOptions? = null,

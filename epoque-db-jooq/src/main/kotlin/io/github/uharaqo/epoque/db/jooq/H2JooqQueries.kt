@@ -2,8 +2,9 @@ package io.github.uharaqo.epoque.db.jooq
 
 import arrow.core.Either
 import arrow.core.left
-import io.github.uharaqo.epoque.api.EpoqueException.EventWriteConflict
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_WRITE_CONFLICT
 import io.github.uharaqo.epoque.api.EventType
+import io.github.uharaqo.epoque.api.Failable
 import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.SerializedData
 import io.github.uharaqo.epoque.api.SerializedEvent
@@ -73,13 +74,13 @@ class H2JooqQueries(
             .awaitFirstOrNull() ?: 0
 
         if (cnt != records.size) {
-          throw EventWriteConflict("Failed to write events due to conflict")
+          throw EVENT_WRITE_CONFLICT()
         }
       }
     }
 
   /** Prevent the next record to be written through another connection */
-  override suspend fun lockNextEvent(ctx: DSLContext, key: JournalKey): Either<EventWriteConflict, Unit> =
+  override suspend fun lockNextEvent(ctx: DSLContext, key: JournalKey): Failable<Unit> =
     Either.catch {
       when {
         // try locking the record with the earliest version
@@ -95,8 +96,8 @@ class H2JooqQueries(
         }
       }
     }
-      .map { if (!it) EventWriteConflict("Failed to acquire lock").left() }
-      .mapLeft { EventWriteConflict("Failed to write event due to conflict: $key", it) }
+      .map { if (!it) EVENT_WRITE_CONFLICT().left() }
+      .mapLeft { EVENT_WRITE_CONFLICT(it) }
 
   /** Insert an empty event to acquire the lock for the row to be written */
   private suspend fun DSLContext.insertDummyEventForLock(

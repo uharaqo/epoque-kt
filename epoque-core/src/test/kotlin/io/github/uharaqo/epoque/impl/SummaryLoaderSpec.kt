@@ -1,11 +1,10 @@
 package io.github.uharaqo.epoque.impl
 
-import arrow.core.Either
 import arrow.core.getOrElse
 import arrow.core.right
 import io.github.uharaqo.epoque.api.CanLoadSummary
-import io.github.uharaqo.epoque.api.EpoqueException.EventLoadFailure
 import io.github.uharaqo.epoque.api.EventLoader
+import io.github.uharaqo.epoque.api.Failable
 import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.Version
@@ -51,11 +50,11 @@ class SummaryLoaderSpec : StringSpec(
           key: JournalKey,
           prevVersion: Version,
           tx: TransactionContext,
-        ): Either<EventLoadFailure, Flow<VersionedEvent>> =
+        ): Failable<Flow<VersionedEvent>> =
           flowOf(VersionedEvent(Version(2), dummyEventType, serializedEvent2)).right()
       }
 
-      shouldThrowMessage("Event version mismatch. prev: 0, received: 2: $dummyEventType") {
+      shouldThrowMessage("SUMMARY_AGGREGATION_FAILURE: Event version mismatch. prev: 0, received: 2: $dummyEventType") {
         newSummaryLoader(dummyEventLoader).loadSummary(
           key = dummyJournalKey,
           tx = mockk(),

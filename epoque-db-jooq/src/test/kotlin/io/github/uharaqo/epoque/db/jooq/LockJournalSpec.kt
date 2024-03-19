@@ -5,7 +5,6 @@ import io.github.uharaqo.epoque.api.CommandExecutorOptions
 import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.EpoqueException
-import io.github.uharaqo.epoque.api.EpoqueException.EventWriteConflict
 import io.github.uharaqo.epoque.api.EventStore
 import io.github.uharaqo.epoque.api.EventType
 import io.github.uharaqo.epoque.api.JournalGroupId
@@ -66,7 +65,7 @@ class LockJournalSpec : StringSpec(
     }
 
     "Duplicated requests are rejected" {
-      shouldThrow<EventWriteConflict> {
+      shouldThrow<EpoqueException> {
         withConcurrentConnections { store1, store2 ->
           with(store1) {
             startTransactionAndLock(key1, LockOption.DEFAULT) { tx ->
@@ -79,7 +78,7 @@ class LockJournalSpec : StringSpec(
             }.rethrow()
           }
         }
-      } shouldHaveMessage "Failed due to conflict: $key1"
+      } shouldHaveMessage "EVENT_WRITE_CONFLICT"
     }
 
     "LOCK_JOURNAL blocks concurrent inserts (without version 1 record)" {
@@ -119,7 +118,7 @@ class LockJournalSpec : StringSpec(
                   .also { list += "Job2 Writing" }
                 shouldThrow<EpoqueException> {
                   writeEvents(output, tx).rethrow()
-                } shouldHaveMessage "Failed due to conflict: $key1"
+                } shouldHaveMessage "EVENT_WRITE_CONFLICT"
               }.rethrow()
             }
           }
