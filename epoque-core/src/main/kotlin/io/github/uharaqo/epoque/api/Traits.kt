@@ -3,10 +3,9 @@ package io.github.uharaqo.epoque.api
 import arrow.core.Either
 import arrow.core.raise.either
 import arrow.core.raise.ensure
-import io.github.uharaqo.epoque.api.EpoqueException.EventSerializationFailure
-import io.github.uharaqo.epoque.api.EpoqueException.SummaryAggregationFailure
-import io.github.uharaqo.epoque.api.EpoqueException.TimeoutException
-import io.github.uharaqo.epoque.api.EpoqueException.UnknownException
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.SUMMARY_AGGREGATION_FAILURE
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.TIMEOUT_EXCEPTION
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.UNKNOWN_EXCEPTION
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.toList
@@ -19,14 +18,14 @@ interface CanSerializeEvents<E : Any> {
   fun serializeEvents(
     currentVersion: Version,
     events: List<E>,
-  ): Either<EventSerializationFailure, List<VersionedEvent>> = either {
+  ): Failable<List<VersionedEvent>> = either {
     events.withIndex().map { (i, e) ->
       val version = currentVersion + (i + 1)
       serializeEvent(e, version)
     }.bindAll()
   }
 
-  fun serializeEvent(e: E, version: Version): Either<EventSerializationFailure, VersionedEvent> =
+  fun serializeEvent(e: E, version: Version): Failable<VersionedEvent> =
     either {
       val eventType = EventType.of(e::class.java)
       val codec = eventCodecRegistry.find(eventType).bind()
@@ -34,7 +33,6 @@ interface CanSerializeEvents<E : Any> {
 
       VersionedEvent(version, eventType, serialized)
     }
-      .mapLeft { EventSerializationFailure("Failed to serialize event: ${e::class.java}") }
 }
 
 /** Write events by using [EventWriter]. */
@@ -54,7 +52,7 @@ interface CanComputeNextSummary<S, E : Any> : EventHandlerExecutor<S> {
     prevSummary: S,
     eventType: EventType,
     event: SerializedEvent,
-  ): Either<SummaryAggregationFailure, S> = either {
+  ): Failable<S> = either {
     val eventHandler = eventHandlerRegistry.find(eventType).bind()
 
     val codec = eventCodecRegistry.find(eventType).bind()
@@ -62,7 +60,6 @@ interface CanComputeNextSummary<S, E : Any> : EventHandlerExecutor<S> {
 
     eventHandler.handle(prevSummary, deserialized).bind()
   }
-    .mapLeft { SummaryAggregationFailure("Failed to compute summary: $eventType", it) }
 }
 
 /** Aggregate events by using [EventHandlerExecutor]. */
@@ -72,7 +69,7 @@ interface CanAggregateEvents<S> {
   fun aggregateEvents(
     events: List<VersionedEvent>,
     cachedSummary: VersionedSummary<S>?,
-  ): Either<SummaryAggregationFailure, VersionedSummary<S>> = either {
+  ): Failable<VersionedSummary<S>> = either {
     var currentVersion = (cachedSummary?.version ?: Version.ZERO).unwrap
     val initialSummary = cachedSummary?.summary ?: eventHandlerExecutor.emptySummary
 
@@ -80,7 +77,9 @@ interface CanAggregateEvents<S> {
       currentVersion += 1
 
       ensure(currentVersion == ve.version.unwrap) {
-        SummaryAggregationFailure("Event version mismatch. prev: ${currentVersion - 1}, received: ${ve.version}: ${ve.type}")
+        SUMMARY_AGGREGATION_FAILURE.toException(
+          "Event version mismatch. prev: ${currentVersion - 1}, received: ${ve.version}: ${ve.type}",
+        )
       }
 
       eventHandlerExecutor.computeNextSummary(prevSummary, ve.type, ve.event).bind()
@@ -101,7 +100,7 @@ interface CanLoadSummary<S> : CanAggregateEvents<S> {
     key: JournalKey,
     tx: TransactionContext,
     cachedSummary: VersionedSummary<S>? = null,
-  ): Either<EpoqueException, VersionedSummary<S>> = either {
+  ): Failable<VersionedSummary<S>> = either {
     val prevVersion = cachedSummary?.version ?: Version.ZERO
     val events = eventLoader.queryById(key, prevVersion, tx).bind().toList()
 
@@ -128,9 +127,9 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
   val commandHandler: CommandHandler<C, S, E>
   val defaultCommandExecutorOptions: CommandExecutorOptions?
 
-  suspend fun execute(command: C, context: CommandContext): Either<EpoqueException, CommandOutput> =
+  suspend fun execute(command: C, context: CommandContext): Failable<CommandOutput> =
     either {
-      withTimeout(context.options.timeoutMillis) {
+      catchWithTimeout(context.options.timeoutMillis) {
         startTransactionAndLock(context.key, context.options.lockOption) { tx ->
           execute(command, commandHandler, context, tx).bind()
         }.bind()
@@ -142,7 +141,7 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
     commandHandler: CommandHandler<C, S, E>,
     context: CommandContext,
     tx: TransactionContext,
-  ): Either<EpoqueException, CommandOutput> = either {
+  ): Failable<CommandOutput> = either {
     val (currentVersion: Version, currentSummary: S) = loadSummary(context.key, tx).bind()
 
     val events = commandHandler.handle(command, currentSummary).bind()
@@ -156,16 +155,16 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
     output
   }
 
-  private suspend inline fun <T> withTimeout(
+  private suspend inline fun <T> catchWithTimeout(
     timeoutMillis: Long,
     crossinline block: suspend () -> T,
-  ): Either<EpoqueException, T> =
+  ): Failable<T> =
     Either.catch { kotlinx.coroutines.withTimeout(timeoutMillis) { block() } }
       .mapLeft {
         when (it) {
           is EpoqueException -> it
-          is TimeoutCancellationException -> TimeoutException("Timeout", it)
-          else -> UnknownException("Unexpected failure", it)
+          is TimeoutCancellationException -> TIMEOUT_EXCEPTION.toException(it)
+          else -> UNKNOWN_EXCEPTION.toException(it)
         }
       }
 }
@@ -175,7 +174,7 @@ interface CanProcessCommand<C> : CommandProcessor {
   val commandCodec: CommandCodec<C>
   val executor: CanExecuteCommandHandler<C, *, *>
 
-  override suspend fun process(input: CommandInput): Either<EpoqueException, CommandOutput> =
+  override suspend fun process(input: CommandInput): Failable<CommandOutput> =
     either {
       val command = commandCodec.deserialize(input.payload).bind()
 

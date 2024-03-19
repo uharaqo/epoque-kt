@@ -2,7 +2,6 @@ package io.github.uharaqo.epoque.impl
 
 import arrow.core.right
 import io.github.uharaqo.epoque.api.CanAggregateEvents
-import io.github.uharaqo.epoque.api.CommandCodec
 import io.github.uharaqo.epoque.api.CommandInput
 import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.CommandProcessor
@@ -10,6 +9,7 @@ import io.github.uharaqo.epoque.api.EventWriter
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
 import io.github.uharaqo.epoque.api.VersionedSummary
+import io.github.uharaqo.epoque.api.toCommandCodec
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestCommand
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestSummary
 import io.github.uharaqo.epoque.serialization.JsonCodec
@@ -44,7 +44,7 @@ class JournalSpec : StringSpec(
 
       val commandExecutor = dummyCommandExecutor(eventWriter)
       val commandType = dummyCommandType
-      val commandCodec = CommandCodec(JsonCodec.of<TestCommand.Create>())
+      val commandCodec = JsonCodec.of<TestCommand.Create>().toCommandCodec()
       val testProcessor = TypedCommandProcessor(commandCodec, commandExecutor)
       val processor: CommandProcessor =
         CommandRouterBuilder().processorFor<TestCommand.Create>(testProcessor).build()

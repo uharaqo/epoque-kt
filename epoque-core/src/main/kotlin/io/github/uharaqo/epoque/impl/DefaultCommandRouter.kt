@@ -9,7 +9,7 @@ import io.github.uharaqo.epoque.api.CommandProcessor
 import io.github.uharaqo.epoque.api.CommandProcessorRegistry
 import io.github.uharaqo.epoque.api.CommandRouter
 import io.github.uharaqo.epoque.api.CommandType
-import io.github.uharaqo.epoque.api.EpoqueException.UnexpectedCommand
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_NOT_SUPPORTED
 import io.github.uharaqo.epoque.api.EventCodecRegistry
 import io.github.uharaqo.epoque.api.EventHandlerExecutor
 import io.github.uharaqo.epoque.api.EventStore
@@ -18,7 +18,7 @@ import io.github.uharaqo.epoque.api.TransactionStarter
 
 class CommandRouterBuilder {
   private val registry =
-    Registry.builder<CommandType, CommandProcessor, UnexpectedCommand> { UnexpectedCommand("CommandProcessor not found: $it") }
+    Registry.builder<CommandType, CommandProcessor> { COMMAND_NOT_SUPPORTED.toException(it.toString()) }
 
   inline fun <reified C : Any> processorFor(commandProcessor: CommandProcessor): CommandRouterBuilder =
     register(CommandType.of<C>(), commandProcessor)

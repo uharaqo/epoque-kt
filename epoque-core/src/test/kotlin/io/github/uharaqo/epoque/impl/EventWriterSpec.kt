@@ -4,7 +4,6 @@ import arrow.core.right
 import io.github.uharaqo.epoque.api.CanSerializeEvents
 import io.github.uharaqo.epoque.api.CanWriteEvents
 import io.github.uharaqo.epoque.api.CommandOutput
-import io.github.uharaqo.epoque.api.EpoqueException
 import io.github.uharaqo.epoque.api.EventCodec
 import io.github.uharaqo.epoque.api.EventCodecRegistry
 import io.github.uharaqo.epoque.api.EventType
@@ -68,9 +67,7 @@ class EventWriterSpec : StringSpec(
       coEvery { eventWriter.writeEvents(capture(output), any()) } returns Unit.right()
 
       // when
-      val versionedEvents =
-        canSerializeEvents.serializeEvents(Version.ZERO, dummyEvents)
-          .mapLeft { EpoqueException.EventWriteFailure("Failed to serialize event", it) }.rethrow()
+      val versionedEvents = canSerializeEvents.serializeEvents(Version.ZERO, dummyEvents).rethrow()
 
       canWriteEvents.eventWriter.writeEvents(
         output = CommandOutput(versionedEvents, dummyCommandContext),

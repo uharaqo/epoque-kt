@@ -1,7 +1,5 @@
 package io.github.uharaqo.epoque.api
 
-import arrow.core.Either
-import io.github.uharaqo.epoque.api.EpoqueException.EventLoadFailure
 import kotlinx.coroutines.flow.Flow
 
 interface TransactionContext : EpoqueContextValue {
@@ -24,7 +22,7 @@ interface EventWriter {
   suspend fun writeEvents(
     output: CommandOutput,
     tx: TransactionContext,
-  ): Either<EpoqueException, Unit>
+  ): Failable<Unit>
 }
 
 interface EventLoader {
@@ -32,7 +30,7 @@ interface EventLoader {
     key: JournalKey,
     prevVersion: Version,
     tx: TransactionContext,
-  ): Either<EventLoadFailure, Flow<VersionedEvent>>
+  ): Failable<Flow<VersionedEvent>>
 }
 
 interface TransactionStarter {
@@ -40,9 +38,9 @@ interface TransactionStarter {
     key: JournalKey,
     lockOption: LockOption,
     block: suspend (tx: TransactionContext) -> T,
-  ): Either<EpoqueException, T>
+  ): Failable<T>
 
-  suspend fun <T> startDefaultTransaction(block: suspend (tx: TransactionContext) -> T): Either<EpoqueException, T>
+  suspend fun <T> startDefaultTransaction(block: suspend (tx: TransactionContext) -> T): Failable<T>
 }
 
 interface EventStore : EventLoader, EventWriter, TransactionStarter
