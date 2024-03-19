@@ -3,8 +3,11 @@ package io.github.uharaqo.epoque.impl
 import arrow.core.Either
 import arrow.core.raise.either
 import arrow.core.right
+import io.github.uharaqo.epoque.api.CommandContext
 import io.github.uharaqo.epoque.api.CommandExecutorOptions
 import io.github.uharaqo.epoque.api.CommandHandler
+import io.github.uharaqo.epoque.api.CommandOutput
+import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.EpoqueException
 import io.github.uharaqo.epoque.api.EpoqueException.CommandHandlerFailure
 import io.github.uharaqo.epoque.api.EpoqueException.EventHandlerFailure
@@ -16,30 +19,49 @@ import io.github.uharaqo.epoque.api.EventHandler
 import io.github.uharaqo.epoque.api.EventHandlerExecutor
 import io.github.uharaqo.epoque.api.EventHandlerRegistry
 import io.github.uharaqo.epoque.api.EventLoader
+import io.github.uharaqo.epoque.api.EventStore
 import io.github.uharaqo.epoque.api.EventType
 import io.github.uharaqo.epoque.api.EventWriter
 import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.LockOption
+import io.github.uharaqo.epoque.api.SerializedCommand
 import io.github.uharaqo.epoque.api.SerializedEvent
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.TransactionStarter
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
 import io.github.uharaqo.epoque.serialization.SerializedJson
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.serialization.Serializable
 
 abstract class TestEnvironment {
   val dummyJournalKey = JournalKey(JournalGroupId("foo"), JournalId("bar"))
-  val resourceCreatedEventType = EventType(TestEvent.ResourceCreated::class.qualifiedName!!)
   val serializedEvent1 = SerializedEvent(SerializedJson("""{"name":"1"}"""))
   val serializedEvent2 = SerializedEvent(SerializedJson("""{"name":"2"}"""))
+  val serializedCommand = SerializedCommand(SerializedJson("""{"name": "foo"}"""))
 
   val dummyEventCodecRegistry =
     EventCodecRegistryBuilder<TestEvent>().register<TestEvent.ResourceCreated>().build()
+
+  val dummyEventType = EventType.of<TestEvent.ResourceCreated>()
+  val dummyEventHandler = object : EventHandler<TestSummary, TestEvent> {
+    override fun handle(
+      summary: TestSummary,
+      event: TestEvent,
+    ): Either<EventHandlerFailure, TestSummary> = either {
+      if (summary !is TestSummary.Default) {
+        TestSummary.Default(listOf(event))
+      } else {
+        summary.copy(summary.list + event)
+      }
+    }
+  }
 
   val dummyEventHandlerExecutor = object : EventHandlerExecutor<MockSummary> {
     override val emptySummary: MockSummary = MockSummary()
@@ -53,13 +75,13 @@ abstract class TestEnvironment {
 
   val dummyEvents = listOf(TestEvent.ResourceCreated("1"), TestEvent.ResourceCreated("2"))
   val dummyRecords = listOf(
-    VersionedEvent(Version(1), resourceCreatedEventType, serializedEvent1),
-    VersionedEvent(Version(2), resourceCreatedEventType, serializedEvent2),
+    VersionedEvent(Version(1), dummyEventType, serializedEvent1),
+    VersionedEvent(Version(2), dummyEventType, serializedEvent2),
   )
 
   val dummyEventLoader = object : EventLoader {
     override fun queryById(
-      journalKey: JournalKey,
+      key: JournalKey,
       prevVersion: Version,
       tx: TransactionContext,
     ): Either<EventLoadFailure, Flow<VersionedEvent>> =
@@ -68,8 +90,7 @@ abstract class TestEnvironment {
 
   val dummyEventWriter = object : EventWriter {
     override suspend fun writeEvents(
-      journalKey: JournalKey,
-      events: List<VersionedEvent>,
+      output: CommandOutput,
       tx: TransactionContext,
     ): Either<EventWriteFailure, Unit> = Unit.right()
   }
@@ -90,6 +111,7 @@ abstract class TestEnvironment {
       block(dummyTransactionContext).right()
   }
 
+  val dummyCommandType = CommandType.of<TestCommand.Create>()
   val dummyCommandHandler = object : CommandHandler<TestCommand, MockSummary, TestEvent> {
     override fun handle(
       command: TestCommand,
@@ -102,25 +124,12 @@ abstract class TestEnvironment {
       .register<TestCommand.Create>()
       .build()
 
-  val dummyEventHandler = object : EventHandler<TestSummary, TestEvent> {
-    override fun handle(
-      summary: TestSummary,
-      event: TestEvent,
-    ): Either<EventHandlerFailure, TestSummary> = either {
-      if (summary !is TestSummary.Default) {
-        TestSummary.Default(listOf(event))
-      } else {
-        summary.copy(summary.list + event)
-      }
-    }
-  }
-
   val dummyEventHandlerRegistry =
     EventHandlerRegistry(
       Registry.builder<EventType, EventHandler<TestSummary, TestEvent>, UnexpectedEvent> {
         UnexpectedEvent("Unexpected event: $it")
       }.apply {
-        set(resourceCreatedEventType, dummyEventHandler)
+        set(dummyEventType, dummyEventHandler)
       }.build(),
     )
 
@@ -130,6 +139,13 @@ abstract class TestEnvironment {
     TestSummary.Empty,
     dummyEventHandlerRegistry,
     dummyEventCodecRegistry,
+  )
+
+  val dummyCommandContext = CommandContext(
+    dummyJournalKey,
+    dummyCommandType,
+    serializedCommand,
+    CommandExecutorOptions(),
   )
 
   sealed interface TestCommand {
@@ -152,8 +168,43 @@ abstract class TestEnvironment {
   operator fun MockSummary.plus(event: SerializedEvent): MockSummary =
     this.copy(list = list + event)
 
+  fun dummyEventStore(eventWriter: EventWriter? = null) = object : EventStore {
+    override fun queryById(
+      key: JournalKey,
+      prevVersion: Version,
+      tx: TransactionContext,
+    ): Either<EventLoadFailure, Flow<VersionedEvent>> =
+      dummyEventLoader.queryById(key, prevVersion, tx)
+
+    override suspend fun writeEvents(
+      output: CommandOutput,
+      tx: TransactionContext,
+    ): Either<EpoqueException, Unit> = (eventWriter ?: dummyEventWriter).writeEvents(output, tx)
+
+    override suspend fun <T> startTransactionAndLock(
+      key: JournalKey,
+      lockOption: LockOption,
+      block: suspend (tx: TransactionContext) -> T,
+    ): Either<EpoqueException, T> =
+      dummyTransactionStarter.startTransactionAndLock(key, lockOption, block)
+
+    override suspend fun <T> startDefaultTransaction(block: suspend (tx: TransactionContext) -> T): Either<EpoqueException, T> =
+      dummyTransactionStarter.startDefaultTransaction(block)
+  }
+
+  fun mockCommandExecutor(
+    commandOutput: CommandOutput,
+  ): CommandExecutor<TestCommand.Create, MockSummary, TestEvent> {
+    val mock = mockk<CommandExecutor<TestCommand.Create, MockSummary, TestEvent>>()
+    every { mock.journalGroupId.unwrap } returns CommandRouterSpec.dummyJournalKey.groupId.unwrap
+    every { mock.defaultCommandExecutorOptions } returns CommandExecutorOptions()
+    every { mock.eventCodecRegistry } returns CommandRouterSpec.dummyEventCodecRegistry
+    coEvery { mock.execute(any(), any()) } returns commandOutput.right()
+    return mock
+  }
+
   fun dummyCommandExecutor(
-    eventWriter: EventWriter,
+    eventWriter: EventWriter? = null,
     defaultCommandExecutorOptions: CommandExecutorOptions? = null,
   ) =
     CommandExecutor(
@@ -161,9 +212,7 @@ abstract class TestEnvironment {
       dummyCommandHandler,
       dummyEventCodecRegistry,
       dummyEventHandlerExecutor,
-      dummyEventLoader,
-      eventWriter,
-      dummyTransactionStarter,
+      dummyEventStore(eventWriter),
       defaultCommandExecutorOptions,
-    )
+    ) as CommandExecutor<TestCommand.Create, MockSummary, TestEvent>
 }

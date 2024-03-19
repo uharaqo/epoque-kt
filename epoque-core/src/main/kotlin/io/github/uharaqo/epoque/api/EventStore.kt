@@ -22,15 +22,14 @@ enum class LockOption {
 
 interface EventWriter {
   suspend fun writeEvents(
-    journalKey: JournalKey,
-    events: List<VersionedEvent>,
+    output: CommandOutput,
     tx: TransactionContext,
   ): Either<EpoqueException, Unit>
 }
 
 interface EventLoader {
   fun queryById(
-    journalKey: JournalKey,
+    key: JournalKey,
     prevVersion: Version,
     tx: TransactionContext,
   ): Either<EventLoadFailure, Flow<VersionedEvent>>

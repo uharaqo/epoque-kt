@@ -24,7 +24,7 @@ class SummaryLoaderSpec : StringSpec(
     "EventLoader and SummaryGenerator work as SummaryLoadable" {
       val summary =
         newSummaryLoader().loadSummary(
-          journalKey = dummyJournalKey,
+          key = dummyJournalKey,
           tx = mockk(),
         ).getOrElse { throw it }
 
@@ -36,7 +36,7 @@ class SummaryLoaderSpec : StringSpec(
       val cachedSummary = VersionedSummary(Version(1), MockSummary(listOf(serializedEvent1)))
       val summary =
         newSummaryLoader().loadSummary(
-          journalKey = dummyJournalKey,
+          key = dummyJournalKey,
           tx = mockk(),
           cachedSummary = cachedSummary,
         ).getOrElse { throw it }
@@ -48,16 +48,16 @@ class SummaryLoaderSpec : StringSpec(
     "SummaryLoadable fails on version mismatch" {
       val dummyEventLoader = object : EventLoader {
         override fun queryById(
-          journalKey: JournalKey,
+          key: JournalKey,
           prevVersion: Version,
           tx: TransactionContext,
         ): Either<EventLoadFailure, Flow<VersionedEvent>> =
-          flowOf(VersionedEvent(Version(2), resourceCreatedEventType, serializedEvent2)).right()
+          flowOf(VersionedEvent(Version(2), dummyEventType, serializedEvent2)).right()
       }
 
-      shouldThrowMessage("Event version mismatch. prev: 0, received: 2: $resourceCreatedEventType") {
+      shouldThrowMessage("Event version mismatch. prev: 0, received: 2: $dummyEventType") {
         newSummaryLoader(dummyEventLoader).loadSummary(
-          journalKey = dummyJournalKey,
+          key = dummyJournalKey,
           tx = mockk(),
           cachedSummary = null,
         ).getOrElse { throw it }

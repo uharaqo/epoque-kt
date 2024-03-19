@@ -1,41 +1,33 @@
 package io.github.uharaqo.epoque.impl
 
-import arrow.core.right
 import io.github.uharaqo.epoque.api.CommandInput
 import io.github.uharaqo.epoque.api.CommandOutput
-import io.github.uharaqo.epoque.api.CommandType
-import io.github.uharaqo.epoque.api.JournalId
-import io.github.uharaqo.epoque.api.SerializedCommand
 import io.github.uharaqo.epoque.api.toCommandCodec
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestCommand
 import io.github.uharaqo.epoque.serialization.JsonCodec
-import io.github.uharaqo.epoque.serialization.SerializedJson
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.core.spec.style.StringSpec
-import io.mockk.coEvery
-import io.mockk.mockk
 
 class CommandRouterSpec : StringSpec(
   {
     "command deserializer and processor are found and executed properly" {
       // given
-      val commandExecutor = mockk<CommandExecutor<TestCommand.Create, *, *>>()
+      val commandOutput = CommandOutput(dummyRecords, dummyCommandContext)
+      val commandExecutor = mockCommandExecutor(commandOutput)
       val commandCodec = JsonCodec.of<TestCommand.Create>().toCommandCodec()
       val processor = TypedCommandProcessor(commandCodec, commandExecutor)
       val commandRouter = CommandRouterBuilder().processorFor<TestCommand.Create>(processor).build()
 
-      coEvery { commandExecutor.execute(any(), any()) } returns CommandOutput(dummyRecords).right()
-
       // when
       val input = CommandInput(
-        id = JournalId("JID_1"),
-        type = CommandType.of<TestCommand.Create>(),
-        payload = SerializedCommand(SerializedJson("""{"name":"Whatever"}""")),
+        id = dummyJournalKey.id,
+        type = dummyCommandType,
+        payload = serializedCommand,
       )
-      val out = commandRouter.process(input)
+      val output = commandRouter.process(input)
 
       // then
-      out shouldBeRight CommandOutput(dummyRecords)
+      output shouldBeRight commandOutput
     }
   },
 ) {

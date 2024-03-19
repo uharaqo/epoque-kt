@@ -2,16 +2,17 @@ package io.github.uharaqo.epoque.impl
 
 import arrow.core.right
 import io.github.uharaqo.epoque.api.CanAggregateEvents
+import io.github.uharaqo.epoque.api.CommandCodec
 import io.github.uharaqo.epoque.api.CommandInput
 import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.CommandProcessor
-import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.EventWriter
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
 import io.github.uharaqo.epoque.api.VersionedSummary
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestCommand
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestSummary
+import io.github.uharaqo.epoque.serialization.JsonCodec
 import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -38,12 +39,12 @@ class JournalSpec : StringSpec(
     "Basic components work together as expected" {
       // given
       val eventWriter = mockk<EventWriter>()
-      val slot = slot<List<VersionedEvent>>()
-      coEvery { eventWriter.writeEvents(any(), capture(slot), any()) } returns Unit.right()
+      val slot = slot<CommandOutput>()
+      coEvery { eventWriter.writeEvents(capture(slot), any()) } returns Unit.right()
 
       val commandExecutor = dummyCommandExecutor(eventWriter)
-      val commandType = CommandType.of<TestCommand.Create>()
-      val commandCodec = dummyCommandCodecRegistry.find(commandType).rethrow()
+      val commandType = dummyCommandType
+      val commandCodec = CommandCodec(JsonCodec.of<TestCommand.Create>())
       val testProcessor = TypedCommandProcessor(commandCodec, commandExecutor)
       val processor: CommandProcessor =
         CommandRouterBuilder().processorFor<TestCommand.Create>(testProcessor).build()
@@ -55,12 +56,10 @@ class JournalSpec : StringSpec(
         processor.process(CommandInput(dummyJournalKey.id, commandType, serialized)).rethrow()
 
       // then
-      output.events shouldBe slot.captured
-      output shouldBe CommandOutput(
-        listOf(
-          VersionedEvent(Version(3), resourceCreatedEventType, serializedEvent1),
-          VersionedEvent(Version(4), resourceCreatedEventType, serializedEvent2),
-        ),
+      output.events shouldBe slot.captured.events
+      output.events shouldBe listOf(
+        VersionedEvent(Version(3), dummyEventType, serializedEvent1),
+        VersionedEvent(Version(4), dummyEventType, serializedEvent2),
       )
     }
   },
