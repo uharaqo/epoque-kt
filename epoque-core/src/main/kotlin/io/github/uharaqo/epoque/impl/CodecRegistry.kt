@@ -14,7 +14,7 @@ import io.github.uharaqo.epoque.serialization.JsonCodec
 
 class EventCodecRegistryBuilder<E : Any> {
   val registry =
-    Registry.builder<EventType, EventCodec<E>> { EVENT_NOT_SUPPORTED(it.toString()) }
+    Registry.builder<EventType, EventCodec<E>> { EVENT_NOT_SUPPORTED.toException(it.toString()) }
 
   inline fun <reified E2 : E> register() = this.also {
     @Suppress("UNCHECKED_CAST")
@@ -26,7 +26,7 @@ class EventCodecRegistryBuilder<E : Any> {
 
 class CommandCodecRegistryBuilder<C : Any> {
   val registry =
-    Registry.builder<CommandType, CommandCodec<C>> { COMMAND_NOT_SUPPORTED(it.toString()) }
+    Registry.builder<CommandType, CommandCodec<C>> { COMMAND_NOT_SUPPORTED.toException(it.toString()) }
 
   inline fun <reified C2 : C> register() = this.also {
     @Suppress("UNCHECKED_CAST")

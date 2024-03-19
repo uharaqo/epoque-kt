@@ -48,11 +48,11 @@ class EventCodec<E>(
 ) : DataCodec<E, SerializedEvent>, EventSerializer<E>, EventDeserializer<E> {
   override fun serialize(value: E): Failable<SerializedEvent> =
     codec.serialize(value).map(::SerializedEvent)
-      .mapLeft { EVENT_SERIALIZATION_FAILURE(type, it) }
+      .mapLeft { EVENT_SERIALIZATION_FAILURE.toException(type, it) }
 
   override fun deserialize(serialized: SerializedEvent): Failable<E> =
     codec.deserialize(serialized.unwrap)
-      .mapLeft { EVENT_DESERIALIZATION_FAILURE(type, it) }
+      .mapLeft { EVENT_DESERIALIZATION_FAILURE.toException(type, it) }
 }
 
 fun <E> DataCodec<E, SerializedData>.toEventCodec(): EventCodec<E> = EventCodec(type, this)
@@ -92,11 +92,11 @@ class CommandCodec<C>(
 
   override fun serialize(value: C): Failable<SerializedCommand> =
     codec.serialize(value).map(::SerializedCommand)
-      .mapLeft { COMMAND_SERIALIZATION_FAILURE(type, it) }
+      .mapLeft { COMMAND_SERIALIZATION_FAILURE.toException(type, it) }
 
   override fun deserialize(serialized: SerializedCommand): Failable<C> =
     codec.deserialize(serialized.unwrap)
-      .mapLeft { COMMAND_DESERIALIZATION_FAILURE(type, it) }
+      .mapLeft { COMMAND_DESERIALIZATION_FAILURE.toException(type, it) }
 
   object Key : EpoqueContextKey<CommandCodec<*>>
 }

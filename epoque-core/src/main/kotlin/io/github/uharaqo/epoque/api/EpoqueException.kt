@@ -22,9 +22,9 @@ class EpoqueException(cause: Cause, details: String? = null, t: Throwable? = nul
     UNKNOWN_EXCEPTION,
     ;
 
-    operator fun invoke(t: Throwable? = null): EpoqueException = EpoqueException(this, null, t)
+    fun toException(t: Throwable? = null): EpoqueException = EpoqueException(this, null, t)
 
-    operator fun invoke(message: String, t: Throwable? = null): EpoqueException =
+    fun toException(message: String, t: Throwable? = null): EpoqueException =
       EpoqueException(this, message, t)
   }
 }

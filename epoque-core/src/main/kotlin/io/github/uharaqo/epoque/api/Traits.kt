@@ -77,7 +77,7 @@ interface CanAggregateEvents<S> {
       currentVersion += 1
 
       ensure(currentVersion == ve.version.unwrap) {
-        SUMMARY_AGGREGATION_FAILURE(
+        SUMMARY_AGGREGATION_FAILURE.toException(
           "Event version mismatch. prev: ${currentVersion - 1}, received: ${ve.version}: ${ve.type}",
         )
       }
@@ -129,7 +129,7 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
 
   suspend fun execute(command: C, context: CommandContext): Failable<CommandOutput> =
     either {
-      withTimeout(context.options.timeoutMillis) {
+      catchWithTimeout(context.options.timeoutMillis) {
         startTransactionAndLock(context.key, context.options.lockOption) { tx ->
           execute(command, commandHandler, context, tx).bind()
         }.bind()
@@ -155,7 +155,7 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
     output
   }
 
-  private suspend inline fun <T> withTimeout(
+  private suspend inline fun <T> catchWithTimeout(
     timeoutMillis: Long,
     crossinline block: suspend () -> T,
   ): Failable<T> =
@@ -163,8 +163,8 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
       .mapLeft {
         when (it) {
           is EpoqueException -> it
-          is TimeoutCancellationException -> TIMEOUT_EXCEPTION(it)
-          else -> UNKNOWN_EXCEPTION(it)
+          is TimeoutCancellationException -> TIMEOUT_EXCEPTION.toException(it)
+          else -> UNKNOWN_EXCEPTION.toException(it)
         }
       }
 }

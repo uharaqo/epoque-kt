@@ -2,8 +2,6 @@ package io.github.uharaqo.epoque.db.jooq
 
 import arrow.core.Either
 import arrow.core.getOrElse
-import arrow.core.raise.catch
-import arrow.core.raise.either
 import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.EpoqueContext
 import io.github.uharaqo.epoque.api.EpoqueException
@@ -17,12 +15,12 @@ import io.github.uharaqo.epoque.api.LockOption
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
-import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import org.jooq.DSLContext
 import org.jooq.exception.IntegrityConstraintViolationException
 import org.jooq.kotlin.coroutines.transactionCoroutine
+import kotlin.coroutines.coroutineContext
 
 class JooqEventStore<D>(
   private val originalContext: DSLContext,
@@ -32,28 +30,20 @@ class JooqEventStore<D>(
     key: JournalKey,
     prevVersion: Version,
     tx: TransactionContext,
-  ): Failable<Flow<VersionedEvent>> = either {
-    catch(
-      {
-        tx.asJooqBlocking {
-          queries.selectById(ctx, key, prevVersion)
-        }
-      },
-    ) { raise(EVENT_READ_FAILURE(it)) }
-  }
+  ): Failable<Flow<VersionedEvent>> = Either.catch {
+    tx.asJooqBlocking {
+      queries.selectById(ctx, key, prevVersion)
+    }
+  }.mapLeft { EVENT_READ_FAILURE.toException(it) }
 
   override suspend fun writeEvents(
     output: CommandOutput,
     tx: TransactionContext,
-  ): Failable<Unit> = either {
-    catch(
-      {
-        tx.asJooq {
-          queries.writeEvents(ctx, output.context.key, output.events)
-        }
-      },
-    ) { raise(it.toEpoqueException()) }
-  }
+  ): Failable<Unit> = Either.catch {
+    tx.asJooq {
+      queries.writeEvents(ctx, output.context.key, output.events)
+    }
+  }.mapLeft { it.toEpoqueException() }
 
   private suspend fun getTransactionContext() = TransactionContext.Key.get()
 
@@ -107,8 +97,8 @@ class JooqEventStore<D>(
 
   private fun Throwable.toEpoqueException(): EpoqueException =
     when (this) {
-      is IntegrityConstraintViolationException -> EVENT_WRITE_CONFLICT(this)
+      is IntegrityConstraintViolationException -> EVENT_WRITE_CONFLICT.toException(this)
       is EpoqueException -> this
-      else -> EVENT_WRITE_FAILURE(this)
+      else -> EVENT_WRITE_FAILURE.toException(this)
     }
 }

@@ -74,7 +74,7 @@ class H2JooqQueries(
             .awaitFirstOrNull() ?: 0
 
         if (cnt != records.size) {
-          throw EVENT_WRITE_CONFLICT()
+          throw EVENT_WRITE_CONFLICT.toException()
         }
       }
     }
@@ -96,8 +96,8 @@ class H2JooqQueries(
         }
       }
     }
-      .map { if (!it) EVENT_WRITE_CONFLICT().left() }
-      .mapLeft { EVENT_WRITE_CONFLICT(it) }
+      .map { if (!it) EVENT_WRITE_CONFLICT.toException().left() }
+      .mapLeft { EVENT_WRITE_CONFLICT.toException(it) }
 
   /** Insert an empty event to acquire the lock for the row to be written */
   private suspend fun DSLContext.insertDummyEventForLock(

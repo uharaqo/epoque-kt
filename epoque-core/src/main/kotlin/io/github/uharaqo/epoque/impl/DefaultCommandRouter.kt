@@ -18,7 +18,7 @@ import io.github.uharaqo.epoque.api.TransactionStarter
 
 class CommandRouterBuilder {
   private val registry =
-    Registry.builder<CommandType, CommandProcessor> { COMMAND_NOT_SUPPORTED(it.toString()) }
+    Registry.builder<CommandType, CommandProcessor> { COMMAND_NOT_SUPPORTED.toException(it.toString()) }
 
   inline fun <reified C : Any> processorFor(commandProcessor: CommandProcessor): CommandRouterBuilder =
     register(CommandType.of<C>(), commandProcessor)

@@ -121,7 +121,7 @@ abstract class TestEnvironment {
   val dummyEventHandlerRegistry =
     EventHandlerRegistry(
       Registry.builder<EventType, EventHandler<TestSummary, TestEvent>> {
-        EVENT_NOT_SUPPORTED(it.toString())
+        EVENT_NOT_SUPPORTED.toException(it.toString())
       }.apply {
         set(dummyEventType, dummyEventHandler)
       }.build(),
