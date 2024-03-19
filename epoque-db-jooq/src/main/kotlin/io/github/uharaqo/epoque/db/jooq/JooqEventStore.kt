@@ -4,6 +4,7 @@ import arrow.core.Either
 import arrow.core.getOrElse
 import arrow.core.raise.catch
 import arrow.core.raise.either
+import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.EpoqueContext
 import io.github.uharaqo.epoque.api.EpoqueException
 import io.github.uharaqo.epoque.api.EpoqueException.EventLoadFailure
@@ -25,31 +26,30 @@ class JooqEventStore<D>(
   private val queries: JooqQueries<D>,
 ) : EventStore {
   override fun queryById(
-    journalKey: JournalKey,
+    key: JournalKey,
     prevVersion: Version,
     tx: TransactionContext,
   ): Either<EventLoadFailure, Flow<VersionedEvent>> = either {
     catch(
       {
         tx.asJooqBlocking {
-          with(queries) { ctx.selectById(journalKey, prevVersion) }
+          queries.selectById(ctx, key, prevVersion)
         }
       },
-    ) { raise(EventLoadFailure("Failed to load events: $journalKey", it)) }
+    ) { raise(EventLoadFailure("Failed to load events: $key", it)) }
   }
 
   override suspend fun writeEvents(
-    journalKey: JournalKey,
-    events: List<VersionedEvent>,
+    output: CommandOutput,
     tx: TransactionContext,
   ): Either<EpoqueException, Unit> = either {
     catch(
       {
         tx.asJooq {
-          with(queries) { ctx.writeEvents(journalKey, events) }
+          queries.writeEvents(ctx, output.context.key, output.events)
         }
       },
-    ) { raise(it.toEpoqueException(": $journalKey")) }
+    ) { raise(it.toEpoqueException(": ${output.context.key}")) }
   }
 
   private suspend fun getTransactionContext() = TransactionContext.Key.get()
@@ -62,7 +62,7 @@ class JooqEventStore<D>(
     beforeExecute: suspend (DSLContext) -> Unit = {},
   ): T {
     // explicitly propagate this context because current context has Job related contexts
-    val epoqueContext = coroutineContext[EpoqueContext.Key] ?: EpoqueContext()
+    val epoqueContext = coroutineContext[EpoqueContext.Key] ?: EpoqueContext.create()
 
     return ctx.transactionCoroutine(Dispatchers.IO) { conf ->
       val tx = JooqTransactionContext(conf.dsl(), lockOption, lockedKeys)
@@ -97,9 +97,7 @@ class JooqEventStore<D>(
         val prevCtx = prevTx?.asJooq { ctx } ?: originalContext
 
         runTransaction(prevCtx, lockOption, locked + key, block) { ctx ->
-          with(queries) {
-            ctx.lockNextEvent(key).getOrElse { throw it }
-          }
+          queries.lockNextEvent(ctx, key).getOrElse { throw it }
         }
       }.mapLeft { it.toEpoqueException(": $key") }
     }

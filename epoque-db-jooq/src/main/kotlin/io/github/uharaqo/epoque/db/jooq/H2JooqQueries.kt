@@ -27,16 +27,17 @@ class H2JooqQueries(
 
   override fun SerializedData.toFieldValue(): JSONB = JSONB.jsonb(this.toText())
 
-  override fun DSLContext.selectById(
-    journalKey: JournalKey,
+  override fun selectById(
+    ctx: DSLContext,
+    key: JournalKey,
     prevVersion: Version,
   ): Flow<VersionedEvent> =
     with(def) {
-      select(VERSION, TYPE, CONTENT)
+      ctx.select(this.VERSION, this.TYPE, this.CONTENT)
         .from(EVENT)
         .where(
-          GROUP.eq(journalKey.groupId.unwrap),
-          ID.eq(journalKey.id.unwrap),
+          GROUP.eq(key.groupId.unwrap),
+          ID.eq(key.id.unwrap),
           VERSION.gt(prevVersion.unwrap),
         )
         .orderBy(VERSION.asc())
@@ -50,18 +51,15 @@ class H2JooqQueries(
         }
     }
 
-  override suspend fun DSLContext.writeEvents(
-    journalKey: JournalKey,
-    events: List<VersionedEvent>,
-  ) =
+  override suspend fun writeEvents(ctx: DSLContext, key: JournalKey, events: List<VersionedEvent>) =
     with(def) {
-      transactionCoroutine {
+      ctx.transactionCoroutine {
         val tx = it.dsl()
         val records =
           events.asSequence().map { e ->
             row(
-              journalKey.groupId.unwrap,
-              journalKey.id.unwrap,
+              key.groupId.unwrap,
+              key.id.unwrap,
               e.version.unwrap,
               e.type.unwrap,
               e.event.unwrap.toFieldValue(),
@@ -69,8 +67,8 @@ class H2JooqQueries(
           }.toList()
 
         val cnt =
-          tx.insertInto(EVENT)
-            .columns(GROUP, ID, VERSION, TYPE, CONTENT)
+          tx.insertInto(this.EVENT)
+            .columns(this.GROUP, this.ID, this.VERSION, this.TYPE, this.CONTENT)
             .valuesOfRows(records)
             .awaitFirstOrNull() ?: 0
 
@@ -81,17 +79,17 @@ class H2JooqQueries(
     }
 
   /** Prevent the next record to be written through another connection */
-  override suspend fun DSLContext.lockNextEvent(key: JournalKey): Either<EventWriteConflict, Unit> =
+  override suspend fun lockNextEvent(ctx: DSLContext, key: JournalKey): Either<EventWriteConflict, Unit> =
     Either.catch {
       when {
         // try locking the record with the earliest version
-        lockEarliestEvent(key) -> true
+        ctx.lockEarliestEvent(key) -> true
 
         else -> when {
           // if not found, insert a dummy record with the earliest version to prevent concurrent processing
-          insertDummyEventForLock(key, version = 1L) &&
+          ctx.insertDummyEventForLock(key, version = 1L) &&
             // no need to keep the record
-            deleteDummyEventForLock(key, version = 1L) -> true
+            ctx.deleteDummyEventForLock(key, version = 1L) -> true
 
           else -> false
         }

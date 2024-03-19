@@ -1,7 +1,10 @@
 package io.github.uharaqo.epoque.impl
 
 import arrow.core.right
+import io.github.uharaqo.epoque.api.CanSerializeEvents
 import io.github.uharaqo.epoque.api.CanWriteEvents
+import io.github.uharaqo.epoque.api.CommandOutput
+import io.github.uharaqo.epoque.api.EpoqueException
 import io.github.uharaqo.epoque.api.EventCodec
 import io.github.uharaqo.epoque.api.EventCodecRegistry
 import io.github.uharaqo.epoque.api.EventType
@@ -9,7 +12,6 @@ import io.github.uharaqo.epoque.api.EventWriter
 import io.github.uharaqo.epoque.api.SerializedEvent
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.Version
-import io.github.uharaqo.epoque.api.VersionedEvent
 import io.github.uharaqo.epoque.api.toEventCodec
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestEvent
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestEvent.ResourceCreated
@@ -52,33 +54,31 @@ class EventWriterSpec : StringSpec(
     }
 
     "EventCodecRegistry and EventWriter work as EventWritable" {
+      // given
       val eventWriter = mockk<EventWriter>()
       val tx = mockk<TransactionContext>()
 
-      val canWriteEvents = object : CanWriteEvents<TestEvent> {
-        override val eventWriter = eventWriter
+      val canSerializeEvents = object : CanSerializeEvents<TestEvent> {
         override val eventCodecRegistry = dummyEventCodecRegistry
       }
+      val canWriteEvents = object : CanWriteEvents<TestEvent> {
+        override val eventWriter = eventWriter
+      }
+      val output = slot<CommandOutput>()
+      coEvery { eventWriter.writeEvents(capture(output), any()) } returns Unit.right()
 
-      val writtenEvents = slot<List<VersionedEvent>>()
-      coEvery { eventWriter.writeEvents(any(), capture(writtenEvents), any()) } returns Unit.right()
+      // when
+      val versionedEvents =
+        canSerializeEvents.serializeEvents(Version.ZERO, dummyEvents)
+          .mapLeft { EpoqueException.EventWriteFailure("Failed to serialize event", it) }.rethrow()
 
-      canWriteEvents.writeEvents(
-        journalKey = dummyJournalKey,
-        currentVersion = Version.ZERO,
-        events = listOf(event1, event1),
+      canWriteEvents.eventWriter.writeEvents(
+        output = CommandOutput(versionedEvents, dummyCommandContext),
         tx = tx,
       )
 
-      val expected =
-        VersionedEvent(
-          version = Version.ZERO,
-          type = EventType(ResourceCreated::class.qualifiedName!!),
-          event = serializedEvent1,
-        )
-          .let { listOf(it.copy(version = Version(1)), it.copy(version = Version(2))) }
-
-      writtenEvents.captured shouldBe expected
+      // then
+      output.captured.events shouldBe dummyRecords
     }
   },
 ) {

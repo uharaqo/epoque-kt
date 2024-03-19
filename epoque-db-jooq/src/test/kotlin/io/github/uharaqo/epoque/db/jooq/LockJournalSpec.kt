@@ -1,5 +1,9 @@
 package io.github.uharaqo.epoque.db.jooq
 
+import io.github.uharaqo.epoque.api.CommandContext
+import io.github.uharaqo.epoque.api.CommandExecutorOptions
+import io.github.uharaqo.epoque.api.CommandOutput
+import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.EpoqueException
 import io.github.uharaqo.epoque.api.EpoqueException.EventWriteConflict
 import io.github.uharaqo.epoque.api.EventStore
@@ -8,6 +12,7 @@ import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.LockOption
+import io.github.uharaqo.epoque.api.SerializedCommand
 import io.github.uharaqo.epoque.api.SerializedEvent
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
@@ -51,7 +56,7 @@ class LockJournalSpec : StringSpec(
       val insertedAndFetched =
         runBlocking {
           store.startDefaultTransaction { tx ->
-            store.writeEvents(key1, listOf(event1, event2), tx)
+            store.writeEvents(output, tx)
 
             store.queryById(key1, Version(0), tx).rethrow().toList()
           }.rethrow()
@@ -65,12 +70,12 @@ class LockJournalSpec : StringSpec(
         withConcurrentConnections { store1, store2 ->
           with(store1) {
             startTransactionAndLock(key1, LockOption.DEFAULT) { tx ->
-              writeEvents(key1, listOf(event1, event2), tx).rethrow()
+              writeEvents(output, tx).rethrow()
             }.rethrow()
           }
           with(store2) {
             startTransactionAndLock(key1, LockOption.DEFAULT) { tx ->
-              writeEvents(key1, listOf(event1, event2), tx).rethrow()
+              writeEvents(output, tx).rethrow()
             }.rethrow()
           }
         }
@@ -95,7 +100,7 @@ class LockJournalSpec : StringSpec(
                 log.info("Took a lock. Sleeping @ T2").also { list += "Job1 Sleeping" }
                 delay(t3)
                 log.info("Writing @T4").also { list += "Job1 Writing" }
-                writeEvents(key1, listOf(event1), tx).rethrow()
+                writeEvents(output, tx).rethrow()
               }.rethrow()
             }
           }
@@ -113,7 +118,7 @@ class LockJournalSpec : StringSpec(
                 log.info("Writing @ T5 <- gets called once the job1 release the lock")
                   .also { list += "Job2 Writing" }
                 shouldThrow<EpoqueException> {
-                  writeEvents(key1, listOf(event1), tx).rethrow()
+                  writeEvents(output, tx).rethrow()
                 } shouldHaveMessage "Failed due to conflict: $key1"
               }.rethrow()
             }
@@ -134,6 +139,8 @@ class LockJournalSpec : StringSpec(
         }
       }
     }
+
+    // TODO: test timeout
   },
 ) {
   companion object {
@@ -141,6 +148,12 @@ class LockJournalSpec : StringSpec(
 
     val key1 = JournalKey(JournalGroupId("G1"), JournalId("J1"))
     val key2 = JournalKey(JournalGroupId("G2"), JournalId("J2"))
+    val dummyCommandContext = CommandContext(
+      key1,
+      CommandType("Foo"),
+      SerializedCommand(SerializedJson("{}")),
+      CommandExecutorOptions(),
+    )
     val event1 = VersionedEvent(
       Version(1),
       EventType("foo"),
@@ -151,6 +164,7 @@ class LockJournalSpec : StringSpec(
       EventType("foo"),
       SerializedEvent(SerializedJson("{}")),
     )
+    val output = CommandOutput(listOf(event1, event2), dummyCommandContext)
 
     private suspend fun withConcurrentConnections(f: suspend (EventStore, EventStore) -> Unit) {
       val ctx1 = newDslContext()

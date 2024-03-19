@@ -16,9 +16,9 @@ interface JooqQueries<D> {
   fun D.toSerializedData(): SerializedData
   fun SerializedData.toFieldValue(): D
 
-  fun DSLContext.selectById(journalKey: JournalKey, prevVersion: Version): Flow<VersionedEvent>
+  fun selectById(ctx: DSLContext, key: JournalKey, prevVersion: Version): Flow<VersionedEvent>
 
-  suspend fun DSLContext.writeEvents(journalKey: JournalKey, events: List<VersionedEvent>)
+  suspend fun writeEvents(ctx: DSLContext, key: JournalKey, events: List<VersionedEvent>)
 
-  suspend fun DSLContext.lockNextEvent(key: JournalKey): Either<EventWriteConflict, Unit>
+  suspend fun lockNextEvent(ctx: DSLContext, key: JournalKey): Either<EventWriteConflict, Unit>
 }

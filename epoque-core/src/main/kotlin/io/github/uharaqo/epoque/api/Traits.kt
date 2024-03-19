@@ -1,11 +1,9 @@
 package io.github.uharaqo.epoque.api
 
 import arrow.core.Either
-import arrow.core.flatMap
 import arrow.core.raise.either
 import arrow.core.raise.ensure
 import io.github.uharaqo.epoque.api.EpoqueException.EventSerializationFailure
-import io.github.uharaqo.epoque.api.EpoqueException.EventWriteFailure
 import io.github.uharaqo.epoque.api.EpoqueException.SummaryAggregationFailure
 import io.github.uharaqo.epoque.api.EpoqueException.TimeoutException
 import io.github.uharaqo.epoque.api.EpoqueException.UnknownException
@@ -14,6 +12,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withContext
 
+/** Serialize events by using [EventHandlerRegistry]. */
 interface CanSerializeEvents<E : Any> {
   val eventCodecRegistry: EventCodecRegistry<E>
 
@@ -38,25 +37,15 @@ interface CanSerializeEvents<E : Any> {
       .mapLeft { EventSerializationFailure("Failed to serialize event: ${e::class.java}") }
 }
 
-interface CanWriteEvents<E : Any> : CanSerializeEvents<E> {
+/** Write events by using [EventWriter]. */
+interface CanWriteEvents<E : Any> {
   val eventWriter: EventWriter
-
-  suspend fun writeEvents(
-    journalKey: JournalKey,
-    currentVersion: Version,
-    events: List<E>,
-    tx: TransactionContext,
-  ): Either<EpoqueException, List<VersionedEvent>> = either {
-    val versionedEvents =
-      serializeEvents(currentVersion, events)
-        .mapLeft { EventWriteFailure("Failed to serialize event", it) }.bind()
-
-    eventWriter.writeEvents(journalKey, versionedEvents, tx).bind()
-
-    versionedEvents
-  }
 }
 
+/**
+ * Provide a Summary [S] as an [EventHandlerExecutor] by aggregating events using
+ * [EventHandlerRegistry] and [EventCodecRegistry].
+ */
 interface CanComputeNextSummary<S, E : Any> : EventHandlerExecutor<S> {
   val eventHandlerRegistry: EventHandlerRegistry<S, E>
   val eventCodecRegistry: EventCodecRegistry<E>
@@ -76,6 +65,7 @@ interface CanComputeNextSummary<S, E : Any> : EventHandlerExecutor<S> {
     .mapLeft { SummaryAggregationFailure("Failed to compute summary: $eventType", it) }
 }
 
+/** Aggregate events by using [EventHandlerExecutor]. */
 interface CanAggregateEvents<S> {
   val eventHandlerExecutor: EventHandlerExecutor<S>
 
@@ -100,23 +90,37 @@ interface CanAggregateEvents<S> {
   }
 }
 
+/**
+ * Load events by using [EventLoader] and aggregate them as a summary [S]
+ * as an [CanAggregateEvents].
+ */
 interface CanLoadSummary<S> : CanAggregateEvents<S> {
   val eventLoader: EventLoader
 
   suspend fun loadSummary(
-    journalKey: JournalKey,
+    key: JournalKey,
     tx: TransactionContext,
     cachedSummary: VersionedSummary<S>? = null,
   ): Either<EpoqueException, VersionedSummary<S>> = either {
     val prevVersion = cachedSummary?.version ?: Version.ZERO
-    val events = eventLoader.queryById(journalKey, prevVersion, tx).bind().toList()
+    val events = eventLoader.queryById(key, prevVersion, tx).bind().toList()
 
     aggregateEvents(events, cachedSummary).bind()
   }
 }
 
+/**
+ * Execute a command and returns a [CommandOutput]:
+ *
+ * - Start a transaction as a [TransactionStarter]
+ * - Load summary as a [CanLoadSummary]
+ * - Run [CommandHandler]
+ * - Serialize events as a [CanSerializeEvents]
+ * - Write events as a [CanWriteEvents]
+ */
 interface CanExecuteCommandHandler<C, S, E : Any> :
   CanLoadSummary<S>,
+  CanSerializeEvents<E>,
   CanWriteEvents<E>,
   TransactionStarter {
 
@@ -124,30 +128,32 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
   val commandHandler: CommandHandler<C, S, E>
   val defaultCommandExecutorOptions: CommandExecutorOptions?
 
-  suspend fun execute(journalId: JournalId, command: C): Either<EpoqueException, CommandOutput> =
+  suspend fun execute(command: C, context: CommandContext): Either<EpoqueException, CommandOutput> =
     either {
-      val journalKey = JournalKey(journalGroupId, journalId)
-      val options = getCommandExecutorOptions()
-
-      return startTransactionAndLock(journalKey, options.lockOption) { tx ->
-        withTimeout(options.timeoutMillis) {
-          execute(journalKey, command, tx).bind()
-        }.bind() // make sure to throw an exception for rollback
-      }
+      withTimeout(context.options.timeoutMillis) {
+        startTransactionAndLock(context.key, context.options.lockOption) { tx ->
+          execute(command, commandHandler, context, tx).bind()
+        }.bind()
+      }.bind()
     }
 
   suspend fun execute(
-    journalKey: JournalKey,
     command: C,
+    commandHandler: CommandHandler<C, S, E>,
+    context: CommandContext,
     tx: TransactionContext,
   ): Either<EpoqueException, CommandOutput> = either {
-    val (currentVersion: Version, currentSummary: S) = loadSummary(journalKey, tx).bind()
+    val (currentVersion: Version, currentSummary: S) = loadSummary(context.key, tx).bind()
 
     val events = commandHandler.handle(command, currentSummary).bind()
 
-    val versionedEvents = writeEvents(journalKey, currentVersion, events, tx).bind()
+    val versionedEvents = serializeEvents(currentVersion, events).bind()
 
-    CommandOutput(versionedEvents)
+    val output = CommandOutput(versionedEvents, context)
+
+    eventWriter.writeEvents(output, tx).bind()
+
+    output
   }
 
   private suspend inline fun <T> withTimeout(
@@ -162,26 +168,35 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
           else -> UnknownException("Unexpected failure", it)
         }
       }
-
-  private suspend fun getCommandExecutorOptions() =
-    CommandExecutorOptions.Key.get() ?: defaultCommandExecutorOptions ?: CommandExecutorOptions()
 }
 
+/** Deserialize a command by using [CommandCodec] and execute it by using [CanExecuteCommandHandler]. */
 interface CanProcessCommand<C> : CommandProcessor {
   val commandCodec: CommandCodec<C>
-  val canExecuteCommandHandler: CanExecuteCommandHandler<C, *, *>
+  val executor: CanExecuteCommandHandler<C, *, *>
 
-  override suspend fun process(input: CommandInput): Either<EpoqueException, CommandOutput> {
-    val epoqueContext =
-      input.commandExecutorOptions
-        ?.let { EpoqueContext(mapOf(CommandExecutorOptions.Key to it)) }
-        ?: EpoqueContext()
+  override suspend fun process(input: CommandInput): Either<EpoqueException, CommandOutput> =
+    either {
+      val command = commandCodec.deserialize(input.payload).bind()
 
-    return commandCodec.deserialize(input.payload)
-      .flatMap { command ->
-        withContext(coroutineContext + epoqueContext) {
-          canExecuteCommandHandler.execute(input.id, command)
-        }
+      val commandContext = CommandContext(
+        key = JournalKey(executor.journalGroupId, input.id),
+        commandType = input.type,
+        command = input.payload,
+        options =
+        input.commandExecutorOptions
+          ?: executor.defaultCommandExecutorOptions
+          ?: CommandExecutorOptions(),
+      )
+
+      val epoqueContext =
+        EpoqueContext.create()
+          .with(CommandContext.Key, commandContext)
+          .with(EventCodecRegistry.Key, executor.eventCodecRegistry)
+          .with(CommandCodec.Key, commandCodec)
+
+      withContext(coroutineContext + epoqueContext) {
+        executor.execute(command, commandContext).bind()
       }
-  }
+    }
 }
