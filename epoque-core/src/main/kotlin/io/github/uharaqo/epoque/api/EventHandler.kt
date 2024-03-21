@@ -1,9 +1,7 @@
 package io.github.uharaqo.epoque.api
 
-import io.github.uharaqo.epoque.impl.Registry
-
-interface EventHandler<S, E> {
-  fun handle(summary: S, event: E): Failable<S>
+fun interface EventHandler<S, E> {
+  fun handle(s: S, e: E): S
 }
 
 @JvmInline

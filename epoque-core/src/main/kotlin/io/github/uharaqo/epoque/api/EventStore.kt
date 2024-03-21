@@ -25,7 +25,11 @@ interface EventWriter {
   ): Failable<Unit>
 }
 
-interface EventLoader {
+fun interface JournalChecker {
+  suspend fun journalExists(key: JournalKey, tx: TransactionContext): Failable<Boolean>
+}
+
+interface EventReader : JournalChecker {
   fun queryById(
     key: JournalKey,
     prevVersion: Version,
@@ -43,4 +47,4 @@ interface TransactionStarter {
   suspend fun <T> startDefaultTransaction(block: suspend (tx: TransactionContext) -> T): Failable<T>
 }
 
-interface EventStore : EventLoader, EventWriter, TransactionStarter
+interface EventStore : EventReader, EventWriter, TransactionStarter

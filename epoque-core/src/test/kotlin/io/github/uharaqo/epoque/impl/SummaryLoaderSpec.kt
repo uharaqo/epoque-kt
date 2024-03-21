@@ -3,7 +3,7 @@ package io.github.uharaqo.epoque.impl
 import arrow.core.getOrElse
 import arrow.core.right
 import io.github.uharaqo.epoque.api.CanLoadSummary
-import io.github.uharaqo.epoque.api.EventLoader
+import io.github.uharaqo.epoque.api.EventReader
 import io.github.uharaqo.epoque.api.Failable
 import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.TransactionContext
@@ -45,17 +45,24 @@ class SummaryLoaderSpec : StringSpec(
     }
 
     "SummaryLoadable fails on version mismatch" {
-      val dummyEventLoader = object : EventLoader {
+      val dummyEventReader = object : EventReader {
         override fun queryById(
           key: JournalKey,
           prevVersion: Version,
           tx: TransactionContext,
         ): Failable<Flow<VersionedEvent>> =
           flowOf(VersionedEvent(Version(2), dummyEventType, serializedEvent2)).right()
+
+        override suspend fun journalExists(
+          key: JournalKey,
+          tx: TransactionContext,
+        ): Failable<Boolean> {
+          TODO("Not yet implemented")
+        }
       }
 
       shouldThrowMessage("SUMMARY_AGGREGATION_FAILURE: Event version mismatch. prev: 0, received: 2: $dummyEventType") {
-        newSummaryLoader(dummyEventLoader).loadSummary(
+        newSummaryLoader(dummyEventReader).loadSummary(
           key = dummyJournalKey,
           tx = mockk(),
           cachedSummary = null,
@@ -65,9 +72,9 @@ class SummaryLoaderSpec : StringSpec(
   },
 ) {
   companion object : TestEnvironment() {
-    fun newSummaryLoader(eventLoader: EventLoader = dummyEventLoader): CanLoadSummary<MockSummary> =
+    fun newSummaryLoader(eventReader: EventReader = dummyEventReader): CanLoadSummary<MockSummary> =
       object : CanLoadSummary<MockSummary> {
-        override val eventLoader = eventLoader
+        override val eventReader = eventReader
         override val eventHandlerExecutor = dummyEventHandlerExecutor
       }
   }

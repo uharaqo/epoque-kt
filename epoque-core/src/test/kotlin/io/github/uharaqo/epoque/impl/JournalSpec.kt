@@ -1,18 +1,17 @@
 package io.github.uharaqo.epoque.impl
 
 import arrow.core.right
+import io.github.uharaqo.epoque.Epoque
 import io.github.uharaqo.epoque.api.CanAggregateEvents
 import io.github.uharaqo.epoque.api.CommandInput
 import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.CommandProcessor
 import io.github.uharaqo.epoque.api.EventWriter
 import io.github.uharaqo.epoque.api.Version
-import io.github.uharaqo.epoque.api.VersionedEvent
 import io.github.uharaqo.epoque.api.VersionedSummary
-import io.github.uharaqo.epoque.api.toCommandCodec
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestCommand
+import io.github.uharaqo.epoque.impl.TestEnvironment.TestEvent
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestSummary
-import io.github.uharaqo.epoque.serialization.JsonCodec
 import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -24,9 +23,8 @@ class JournalSpec : StringSpec(
   {
     "CanAggregateEvents works as expected" {
       // given
-      val executor = DefaultEventHandlerExecutor(dummyJournal)
       val canAggregateEvents = object : CanAggregateEvents<TestSummary> {
-        override val eventHandlerExecutor = executor
+        override val eventHandlerExecutor = dummyJournal
       }
 
       // when
@@ -41,26 +39,29 @@ class JournalSpec : StringSpec(
       val eventWriter = mockk<EventWriter>()
       val slot = slot<CommandOutput>()
       coEvery { eventWriter.writeEvents(capture(slot), any()) } returns Unit.right()
+      val environment = dummyEnvironment.copy(eventWriter = eventWriter)
 
-      val commandExecutor = dummyCommandExecutor(eventWriter)
-      val commandType = dummyCommandType
-      val commandCodec = JsonCodec.of<TestCommand.Create>().toCommandCodec()
-      val testProcessor = TypedCommandProcessor(commandCodec, commandExecutor)
+      val codec = dummyCommandCodecRegistry.find(dummyCommandType).rethrow()
       val processor: CommandProcessor =
-        CommandRouterBuilder().processorFor<TestCommand.Create>(testProcessor).build()
+        Epoque
+          .commandRouterFactoryFor<TestCommand, TestSummary, TestEvent>(
+            TEST_JOURNAL, jsonCodecFactory,
+          ) {
+            commandHandlerFor<TestCommand.Create> { c, s ->
+              emit(dummyEvents)
+            }
+          }
+          .create(environment)
 
       // when
       val command = TestCommand.Create("Integration")
-      val serialized = commandCodec.serialize(command).rethrow()
+      val serialized = codec.encode(command).rethrow()
       val output =
-        processor.process(CommandInput(dummyJournalKey.id, commandType, serialized)).rethrow()
+        processor.process(CommandInput(dummyJournalKey.id, dummyCommandType, serialized)).rethrow()
 
       // then
       output.events shouldBe slot.captured.events
-      output.events shouldBe listOf(
-        VersionedEvent(Version(3), dummyEventType, serializedEvent1),
-        VersionedEvent(Version(4), dummyEventType, serializedEvent2),
-      )
+      output.events shouldBe dummyOutputEvents
     }
   },
 ) {

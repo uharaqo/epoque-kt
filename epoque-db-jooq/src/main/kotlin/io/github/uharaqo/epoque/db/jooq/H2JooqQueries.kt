@@ -34,7 +34,7 @@ class H2JooqQueries(
     prevVersion: Version,
   ): Flow<VersionedEvent> =
     with(def) {
-      ctx.select(this.VERSION, this.TYPE, this.CONTENT)
+      ctx.select(VERSION, TYPE, CONTENT)
         .from(EVENT)
         .where(
           GROUP.eq(key.groupId.unwrap),
@@ -46,10 +46,20 @@ class H2JooqQueries(
         .map {
           VersionedEvent(
             version = Version(it.value1()!!),
-            type = EventType(it.value2()!!),
+            type = EventType.of(Class.forName(it.value2())),
             event = SerializedEvent(it.value3()!!.toSerializedData()),
           )
         }
+    }
+
+  override suspend fun journalExists(ctx: DSLContext, key: JournalKey): Boolean =
+    with(def) {
+      ctx.select(inline(1))
+        .from(EVENT)
+        .where(GROUP.eq(key.groupId.unwrap), ID.eq(key.id.unwrap))
+        .limit(1)
+        .awaitFirstOrNull()
+        ?.value1() != null
     }
 
   override suspend fun writeEvents(ctx: DSLContext, key: JournalKey, events: List<VersionedEvent>) =
@@ -62,14 +72,14 @@ class H2JooqQueries(
               key.groupId.unwrap,
               key.id.unwrap,
               e.version.unwrap,
-              e.type.unwrap,
+              e.type.toString(),
               e.event.unwrap.toFieldValue(),
             )
           }.toList()
 
         val cnt =
-          tx.insertInto(this.EVENT)
-            .columns(this.GROUP, this.ID, this.VERSION, this.TYPE, this.CONTENT)
+          tx.insertInto(EVENT)
+            .columns(GROUP, ID, VERSION, TYPE, CONTENT)
             .valuesOfRows(records)
             .awaitFirstOrNull() ?: 0
 

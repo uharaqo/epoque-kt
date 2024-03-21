@@ -13,8 +13,8 @@ class EpoqueContext private constructor(
 
   override val key = Key
 
-  @Suppress("UNCHECKED_CAST")
   operator fun <V : EpoqueContextValue> get(key: EpoqueContextKey<V>): V? =
+    @Suppress("UNCHECKED_CAST")
     map[key]?.let { it as V }
 
   fun <V : EpoqueContextValue> with(key: EpoqueContextKey<V>, value: V): EpoqueContext =
@@ -33,12 +33,12 @@ class EpoqueContext private constructor(
     return kotlinx.coroutines.withContext(context, block)
   }
 
-  object Key : CoroutineContext.Key<EpoqueContext> {
-    suspend fun get(): EpoqueContext = coroutineContext[this]!!
-  }
+  object Key : CoroutineContext.Key<EpoqueContext>
 
   companion object {
     fun create(): EpoqueContext = EpoqueContext(emptyMap())
+
+    suspend fun get(): EpoqueContext = coroutineContext[Key]!!
   }
 }
 

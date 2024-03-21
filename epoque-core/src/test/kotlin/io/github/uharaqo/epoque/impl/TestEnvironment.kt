@@ -1,33 +1,40 @@
 package io.github.uharaqo.epoque.impl
 
-import arrow.core.raise.either
 import arrow.core.right
+import io.github.uharaqo.epoque.Epoque
 import io.github.uharaqo.epoque.api.CallbackHandler
+import io.github.uharaqo.epoque.api.CommandCodec
 import io.github.uharaqo.epoque.api.CommandContext
 import io.github.uharaqo.epoque.api.CommandExecutorOptions
 import io.github.uharaqo.epoque.api.CommandHandler
+import io.github.uharaqo.epoque.api.CommandHandlerOutput
 import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
-import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_NOT_SUPPORTED
 import io.github.uharaqo.epoque.api.EventHandler
 import io.github.uharaqo.epoque.api.EventHandlerExecutor
 import io.github.uharaqo.epoque.api.EventHandlerRegistry
-import io.github.uharaqo.epoque.api.EventLoader
+import io.github.uharaqo.epoque.api.EventReader
 import io.github.uharaqo.epoque.api.EventStore
 import io.github.uharaqo.epoque.api.EventType
 import io.github.uharaqo.epoque.api.EventWriter
 import io.github.uharaqo.epoque.api.Failable
+import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.LockOption
+import io.github.uharaqo.epoque.api.Metadata
 import io.github.uharaqo.epoque.api.SerializedCommand
 import io.github.uharaqo.epoque.api.SerializedEvent
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.TransactionStarter
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
+import io.github.uharaqo.epoque.api.asInput
+import io.github.uharaqo.epoque.api.asOutput
+import io.github.uharaqo.epoque.serialization.JsonCodec
+import io.github.uharaqo.epoque.serialization.JsonCodecFactory
 import io.github.uharaqo.epoque.serialization.SerializedJson
 import io.mockk.coEvery
 import io.mockk.every
@@ -38,25 +45,41 @@ import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 
 abstract class TestEnvironment {
-  val dummyJournalKey = JournalKey(JournalGroupId("foo"), JournalId("bar"))
+  val jsonCodecFactory = JsonCodecFactory()
+
+  val epoqueBuilder = Epoque.journalFor<TestEvent>(jsonCodecFactory)
+
+  val TEST_JOURNAL = epoqueBuilder.summaryFor<TestSummary>(TestSummary.Empty) {
+    eventHandlerFor<TestEvent.ResourceCreated> { s, e ->
+      if (s is TestSummary.Default) {
+        TestSummary.Default(s.list + e)
+      } else {
+        TestSummary.Default(listOf(e))
+      }
+    }
+  }
+
+  val TEST_COMMANDS = epoqueBuilder.commandRouterFactoryFor<TestCommand, _, _>(TEST_JOURNAL) {
+    commandHandlerFor<TestCommand.Create> { c, s ->
+      emit(dummyEvents)
+    }
+  }
+
+  val dummyJournalKey = JournalKey(JournalGroupId.of<TestEvent>(), JournalId("bar"))
   val serializedEvent1 = SerializedEvent(SerializedJson("""{"name":"1"}"""))
   val serializedEvent2 = SerializedEvent(SerializedJson("""{"name":"2"}"""))
   val serializedCommand = SerializedCommand(SerializedJson("""{"name": "foo"}"""))
 
   val dummyEventCodecRegistry =
-    EventCodecRegistryBuilder<TestEvent>().register<TestEvent.ResourceCreated>().build()
+    EventCodecRegistryBuilder<TestEvent>(jsonCodecFactory).register<TestEvent.ResourceCreated>()
+      .build()
 
   val dummyEventType = EventType.of<TestEvent.ResourceCreated>()
-  val dummyEventHandler = object : EventHandler<TestSummary, TestEvent> {
-    override fun handle(
-      summary: TestSummary,
-      event: TestEvent,
-    ): Failable<TestSummary> = either {
-      if (summary !is TestSummary.Default) {
-        TestSummary.Default(listOf(event))
-      } else {
-        summary.copy(summary.list + event)
-      }
+  val dummyEventHandler = EventHandler<TestSummary, TestEvent> { summary, event ->
+    if (summary !is TestSummary.Default) {
+      TestSummary.Default(listOf(event))
+    } else {
+      summary.copy(summary.list + event)
     }
   }
 
@@ -71,18 +94,27 @@ abstract class TestEnvironment {
   }
 
   val dummyEvents = listOf(TestEvent.ResourceCreated("1"), TestEvent.ResourceCreated("2"))
+  val dummyOutputMetadata = Metadata.empty.asOutput()
+  val dummyCommandHandlerOutput = CommandHandlerOutput(dummyEvents, dummyOutputMetadata)
   val dummyRecords = listOf(
     VersionedEvent(Version(1), dummyEventType, serializedEvent1),
     VersionedEvent(Version(2), dummyEventType, serializedEvent2),
   )
+  val dummyOutputEvents = listOf(
+    VersionedEvent(Version(3), dummyEventType, serializedEvent1),
+    VersionedEvent(Version(4), dummyEventType, serializedEvent2),
+  )
 
-  val dummyEventLoader = object : EventLoader {
+  val dummyEventReader = object : EventReader {
     override fun queryById(
       key: JournalKey,
       prevVersion: Version,
       tx: TransactionContext,
     ): Failable<Flow<VersionedEvent>> =
       dummyRecords.asSequence().drop(prevVersion.unwrap.toInt()).asFlow().right()
+
+    override suspend fun journalExists(key: JournalKey, tx: TransactionContext): Failable<Boolean> =
+      false.right() // TODO
   }
 
   val dummyEventWriter = object : EventWriter {
@@ -109,31 +141,28 @@ abstract class TestEnvironment {
   }
 
   val dummyCommandType = CommandType.of<TestCommand.Create>()
-  val dummyCommandHandler = object : CommandHandler<TestCommand, MockSummary, TestEvent> {
-    override fun handle(
-      command: TestCommand,
-      summary: MockSummary,
-    ): Failable<List<TestEvent>> = dummyEvents.right()
-  }
+  val dummyCommandHandler =
+    CommandHandler<TestCommand, MockSummary, TestEvent> { c, s ->
+      @Suppress("UNCHECKED_CAST")
+      dummyCommandHandlerOutput as CommandHandlerOutput<TestEvent>
+    }
 
   val dummyCommandCodecRegistry =
-    CommandCodecRegistryBuilder<TestCommand>()
-      .register<TestCommand.Create>()
-      .build()
+    RegistryBuilder<CommandType, CommandCodec<TestCommand>>().apply {
+      val codec = JsonCodec.of<TestCommand.Create>().toCommandCodec()
+      set(dummyCommandType, codec as CommandCodec<TestCommand>)
+    }.build { error(it) }
 
   val dummyEventHandlerRegistry =
     EventHandlerRegistry(
-      Registry.builder<EventType, EventHandler<TestSummary, TestEvent>> {
-        EVENT_NOT_SUPPORTED.toException(it.toString())
-      }.apply {
+      RegistryBuilder<EventType, EventHandler<TestSummary, TestEvent>>().apply {
         set(dummyEventType, dummyEventHandler)
-      }.build(),
+      }.build { error(it) },
     )
 
-  val dummyJournal = Journal(
+  val dummyJournal: Journal<TestSummary, TestEvent> = Journal(
     dummyJournalKey.groupId,
-    TestEvent::class,
-    TestSummary.Empty,
+    TestSummary.Empty as TestSummary,
     dummyEventHandlerRegistry,
     dummyEventCodecRegistry,
   )
@@ -142,6 +171,7 @@ abstract class TestEnvironment {
     dummyJournalKey,
     dummyCommandType,
     serializedCommand,
+    Metadata.empty.asInput(),
     CommandExecutorOptions(),
   )
 
@@ -194,7 +224,10 @@ abstract class TestEnvironment {
       prevVersion: Version,
       tx: TransactionContext,
     ): Failable<Flow<VersionedEvent>> =
-      dummyEventLoader.queryById(key, prevVersion, tx)
+      dummyEventReader.queryById(key, prevVersion, tx)
+
+    override suspend fun journalExists(key: JournalKey, tx: TransactionContext): Failable<Boolean> =
+      dummyEventReader.journalExists(key, tx)
 
     override suspend fun writeEvents(
       output: CommandOutput,
@@ -214,8 +247,8 @@ abstract class TestEnvironment {
 
   fun mockCommandExecutor(
     commandOutput: CommandOutput,
-  ): CommandExecutor<TestCommand.Create, MockSummary, TestEvent> {
-    val mock = mockk<CommandExecutor<TestCommand.Create, MockSummary, TestEvent>>()
+  ): CommandExecutor<TestCommand, MockSummary, TestEvent> {
+    val mock = mockk<CommandExecutor<TestCommand, MockSummary, TestEvent>>()
     every { mock.journalGroupId.unwrap } returns CommandRouterSpec.dummyJournalKey.groupId.unwrap
     every { mock.defaultCommandExecutorOptions } returns CommandExecutorOptions()
     every { mock.eventCodecRegistry } returns CommandRouterSpec.dummyEventCodecRegistry
@@ -224,7 +257,7 @@ abstract class TestEnvironment {
   }
 
   val dummyEnvironment = EpoqueEnvironment(
-    dummyEventLoader,
+    dummyEventReader,
     dummyEventWriter,
     dummyTransactionStarter,
     CommandExecutorOptions(),
@@ -234,17 +267,17 @@ abstract class TestEnvironment {
   @Suppress("UNCHECKED_CAST")
   fun dummyCommandExecutor(
     eventWriter: EventWriter? = null,
-  ): CommandExecutor<TestCommand.Create, MockSummary, TestEvent> {
+  ): CommandExecutor<TestCommand, MockSummary, TestEvent> {
     return CommandExecutor(
       dummyJournalKey.groupId,
       dummyCommandHandler,
       dummyEventCodecRegistry,
       dummyEventHandlerExecutor,
-      dummyEnvironment.eventLoader,
+      dummyEnvironment.eventReader,
       eventWriter ?: dummyEnvironment.eventWriter,
       dummyEnvironment.transactionStarter,
       dummyEnvironment.defaultCommandExecutorOptions,
       dummyEnvironment.callbackHandler,
-    ) as CommandExecutor<TestCommand.Create, MockSummary, TestEvent>
+    )
   }
 }

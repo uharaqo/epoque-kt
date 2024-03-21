@@ -41,6 +41,7 @@ data class CommandInput(
   val id: JournalId,
   val type: CommandType,
   val payload: SerializedCommand,
+  val metadata: Metadata = Metadata.empty,
   val commandExecutorOptions: CommandExecutorOptions? = null,
 )
 
@@ -48,13 +49,20 @@ data class CommandContext(
   val key: JournalKey,
   val commandType: CommandType,
   val command: SerializedCommand,
+  val metadata: InputMetadata,
   val options: CommandExecutorOptions,
 ) : EpoqueContextValue {
   object Key : EpoqueContextKey<CommandContext>
 }
 
+data class CommandHandlerOutput<E>(
+  val events: List<E>,
+  val metadata: OutputMetadata,
+)
+
 data class CommandOutput(
   val events: List<VersionedEvent>,
+  val metadata: OutputMetadata,
   val context: CommandContext,
 )
 
@@ -64,9 +72,13 @@ data class CommandExecutorOptions(
 )
 
 data class EpoqueEnvironment(
-  val eventLoader: EventLoader,
+  val eventReader: EventReader,
   val eventWriter: EventWriter,
   val transactionStarter: TransactionStarter,
   val defaultCommandExecutorOptions: CommandExecutorOptions?,
   val callbackHandler: CallbackHandler?,
 )
+
+fun interface Registry<K, V> {
+  fun find(key: K): Failable<V>
+}

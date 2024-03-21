@@ -4,17 +4,13 @@ import arrow.core.right
 import io.github.uharaqo.epoque.api.CanSerializeEvents
 import io.github.uharaqo.epoque.api.CanWriteEvents
 import io.github.uharaqo.epoque.api.CommandOutput
-import io.github.uharaqo.epoque.api.EventCodec
 import io.github.uharaqo.epoque.api.EventCodecRegistry
-import io.github.uharaqo.epoque.api.EventType
 import io.github.uharaqo.epoque.api.EventWriter
 import io.github.uharaqo.epoque.api.SerializedEvent
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.Version
-import io.github.uharaqo.epoque.api.toEventCodec
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestEvent
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestEvent.ResourceCreated
-import io.github.uharaqo.epoque.serialization.JsonCodec
 import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -27,25 +23,25 @@ class EventWriterSpec : StringSpec(
     val event1 = dummyEvents[0]
 
     "JsonEventCodec works as expected" {
-      val codec = JsonCodec.of<ResourceCreated>().toEventCodec()
-      val serialized = codec.serialize(event1).rethrow()
-      val deserialized = codec.deserialize(serialized).rethrow()
+      val codec = dummyEventCodecRegistry.find<ResourceCreated>(dummyEventType).rethrow()
+      val serialized = codec.encode(event1).rethrow()
+      val deserialized = codec.decode(serialized).rethrow()
 
       deserialized shouldBe event1
     }
 
     "EventCodecRegistry hides concrete classes as expected" {
       // codec registry is for the sealed interface: TestEvent
-      val builder = EventCodecRegistryBuilder<TestEvent>()
+      val builder = EventCodecRegistryBuilder<TestEvent>(jsonCodecFactory)
       // register a concrete class: ResourceCreated
-      val sut: EventCodecRegistry<TestEvent> = builder.register<ResourceCreated>().build()
+      val sut: EventCodecRegistry = builder.register<ResourceCreated>().build()
 
       // codec is also for the sealed interface
-      val codec: EventCodec<TestEvent> = sut.find(EventType.of<ResourceCreated>()).rethrow()
+      val codec = sut.find<ResourceCreated>(dummyEventType).rethrow()
 
       // concrete classes are not visible on signatures
-      val serialized: SerializedEvent = codec.serialize(event1).rethrow()
-      val deserialized: TestEvent = codec.deserialize(serialized).rethrow()
+      val serialized: SerializedEvent = codec.encode(event1).rethrow()
+      val deserialized: TestEvent = codec.decode(serialized).rethrow()
 
       // but concrete classes are actually used
       deserialized::class shouldBe ResourceCreated::class
@@ -70,7 +66,7 @@ class EventWriterSpec : StringSpec(
       val versionedEvents = canSerializeEvents.serializeEvents(Version.ZERO, dummyEvents).rethrow()
 
       canWriteEvents.eventWriter.writeEvents(
-        output = CommandOutput(versionedEvents, dummyCommandContext),
+        output = CommandOutput(versionedEvents, dummyOutputMetadata, dummyCommandContext),
         tx = tx,
       )
 

@@ -17,6 +17,8 @@ interface JooqQueries<D> {
 
   fun selectById(ctx: DSLContext, key: JournalKey, prevVersion: Version): Flow<VersionedEvent>
 
+  suspend fun journalExists(ctx: DSLContext, key: JournalKey): Boolean
+
   suspend fun writeEvents(ctx: DSLContext, key: JournalKey, events: List<VersionedEvent>)
 
   suspend fun lockNextEvent(ctx: DSLContext, key: JournalKey): Failable<Unit>
