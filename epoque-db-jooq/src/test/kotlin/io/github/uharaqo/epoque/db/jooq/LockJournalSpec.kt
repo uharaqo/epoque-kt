@@ -11,10 +11,13 @@ import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.LockOption
+import io.github.uharaqo.epoque.api.Metadata
 import io.github.uharaqo.epoque.api.SerializedCommand
 import io.github.uharaqo.epoque.api.SerializedEvent
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
+import io.github.uharaqo.epoque.api.asInput
+import io.github.uharaqo.epoque.api.asOutput
 import io.github.uharaqo.epoque.serialization.SerializedJson
 import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.assertions.throwables.shouldThrow
@@ -149,21 +152,23 @@ class LockJournalSpec : StringSpec(
     val key2 = JournalKey(JournalGroupId("G2"), JournalId("J2"))
     val dummyCommandContext = CommandContext(
       key1,
-      CommandType("Foo"),
+      CommandType.of<String>(),
       SerializedCommand(SerializedJson("{}")),
+      Metadata.empty.asInput(),
       CommandExecutorOptions(),
     )
     val event1 = VersionedEvent(
       Version(1),
-      EventType("foo"),
+      EventType.of<String>(),
       SerializedEvent(SerializedJson("{}")),
     )
     val event2 = VersionedEvent(
       Version(2),
-      EventType("foo"),
+      EventType.of<String>(),
       SerializedEvent(SerializedJson("{}")),
     )
-    val output = CommandOutput(listOf(event1, event2), dummyCommandContext)
+    val output =
+      CommandOutput(listOf(event1, event2), Metadata.empty.asOutput(), dummyCommandContext)
 
     private suspend fun withConcurrentConnections(f: suspend (EventStore, EventStore) -> Unit) {
       val ctx1 = newDslContext()

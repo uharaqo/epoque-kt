@@ -36,6 +36,15 @@ class JooqEventStore<D>(
     }
   }.mapLeft { EVENT_READ_FAILURE.toException(it) }
 
+  override suspend fun journalExists(
+    key: JournalKey,
+    tx: TransactionContext,
+  ): Failable<Boolean> = Either.catch {
+    tx.asJooq {
+      queries.journalExists(ctx, key)
+    }
+  }.mapLeft { EVENT_READ_FAILURE.toException(it) }
+
   override suspend fun writeEvents(
     output: CommandOutput,
     tx: TransactionContext,

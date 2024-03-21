@@ -1,28 +1,27 @@
 package io.github.uharaqo.epoque.api
 
-import arrow.core.Either
-import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_DESERIALIZATION_FAILURE
-import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_SERIALIZATION_FAILURE
-import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_DESERIALIZATION_FAILURE
-import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_SERIALIZATION_FAILURE
-import io.github.uharaqo.epoque.impl.Registry
-
 interface SerializedData {
   fun toText(): String
   fun toByteArray(): ByteArray
 }
 
-interface DataSerializer<V, W> {
-  val type: String
-  fun serialize(value: V): Either<Throwable, W>
+interface DataEncoder<in V> {
+  val type: Class<@UnsafeVariance V>
+  fun encode(value: V): SerializedData
 }
 
-interface DataDeserializer<V, W> {
-  val type: String
-  fun deserialize(serialized: W): Either<Throwable, V>
+interface DataDecoder<out V> {
+  val type: Class<@UnsafeVariance V>
+  fun decode(serialized: SerializedData): V
 }
 
-interface DataCodec<V, W> : DataSerializer<V, W>, DataDeserializer<V, W>
+interface DataCodecFactory {
+  fun <V : Any> create(type: Class<V>): DataCodec<V>
+}
+
+inline fun <reified V : Any> DataCodecFactory.codecFor() = create(V::class.java)
+
+interface DataCodec<V> : DataEncoder<V>, DataDecoder<V>
 
 @JvmInline
 value class SerializedEvent(val unwrap: SerializedData) {
@@ -30,38 +29,38 @@ value class SerializedEvent(val unwrap: SerializedData) {
 }
 
 @JvmInline
-value class EventType(val unwrap: String) {
-  override fun toString(): String = unwrap
+value class EventType private constructor(private val unwrap: Class<*>) {
+  override fun toString(): String = unwrap.canonicalName!!
 
   companion object {
-    fun <E : Any> of(clazz: Class<E>): EventType = EventType(clazz.canonicalName!!)
+    fun <E : Any> of(clazz: Class<E>): EventType = EventType(clazz)
     inline fun <reified E : Any> of(): EventType = of(E::class.java)
   }
 }
 
-interface EventSerializer<E> : DataSerializer<E, SerializedEvent>
-interface EventDeserializer<E> : DataDeserializer<E, SerializedEvent>
-
-class EventCodec<E>(
-  override val type: String,
-  private val codec: DataCodec<E, SerializedData>,
-) : DataCodec<E, SerializedEvent>, EventSerializer<E>, EventDeserializer<E> {
-  override fun serialize(value: E): Failable<SerializedEvent> =
-    codec.serialize(value).map(::SerializedEvent)
-      .mapLeft { EVENT_SERIALIZATION_FAILURE.toException(type, it) }
-
-  override fun deserialize(serialized: SerializedEvent): Failable<E> =
-    codec.deserialize(serialized.unwrap)
-      .mapLeft { EVENT_DESERIALIZATION_FAILURE.toException(type, it) }
+fun interface EventEncoder<in E> {
+  fun encode(value: E): Failable<SerializedEvent>
 }
 
-fun <E> DataCodec<E, SerializedData>.toEventCodec(): EventCodec<E> = EventCodec(type, this)
+fun interface EventDecoder<out E> {
+  fun decode(serialized: SerializedEvent): Failable<E>
+}
+
+data class EventCodec<E>(
+  val encoder: EventEncoder<E>,
+  val decoder: EventDecoder<E>,
+) : EventEncoder<E> by encoder, EventDecoder<E> by decoder
 
 @JvmInline
-value class EventCodecRegistry<E>(
-  private val registry: Registry<EventType, EventCodec<E>>,
-) : Registry<EventType, EventCodec<E>> by registry, EpoqueContextValue {
-  object Key : EpoqueContextKey<EventCodecRegistry<*>>
+value class EventCodecRegistry(
+  private val codecs: Registry<EventType, EventCodec<*>>,
+) : EpoqueContextValue {
+
+  fun <E> find(type: EventType): Failable<EventCodec<E>> =
+    @Suppress("UNCHECKED_CAST")
+    codecs.find(type).map { it as EventCodec<E> }
+
+  object Key : EpoqueContextKey<EventCodecRegistry>
 }
 
 @JvmInline
@@ -70,40 +69,36 @@ value class SerializedCommand(val unwrap: SerializedData) {
 }
 
 @JvmInline
-value class CommandType(private val unwrap: String) {
-  override fun toString(): String = unwrap
+value class CommandType private constructor(private val unwrap: Class<*>) {
+  override fun toString(): String = unwrap.canonicalName!!
 
   companion object {
-    fun <C : Any> of(clazz: Class<C>): CommandType = CommandType(clazz.canonicalName!!)
-    inline fun <reified E : Any> of(): CommandType = of(E::class.java)
+    fun <C : Any> of(clazz: Class<C>): CommandType = CommandType(clazz)
+    inline fun <reified C : Any> of(): CommandType = of(C::class.java)
   }
 }
 
-interface CommandSerializer<E> : DataSerializer<E, SerializedCommand>
-interface CommandDeserializer<E> : DataDeserializer<E, SerializedCommand>
-
-class CommandCodec<C>(
-  override val type: String,
-  private val codec: DataCodec<C, SerializedData>,
-) : DataCodec<C, SerializedCommand>,
-  CommandSerializer<C>,
-  CommandDeserializer<C>,
-  EpoqueContextValue {
-
-  override fun serialize(value: C): Failable<SerializedCommand> =
-    codec.serialize(value).map(::SerializedCommand)
-      .mapLeft { COMMAND_SERIALIZATION_FAILURE.toException(type, it) }
-
-  override fun deserialize(serialized: SerializedCommand): Failable<C> =
-    codec.deserialize(serialized.unwrap)
-      .mapLeft { COMMAND_DESERIALIZATION_FAILURE.toException(type, it) }
-
-  object Key : EpoqueContextKey<CommandCodec<*>>
+fun interface CommandEncoder<in C> {
+  fun encode(value: C): Failable<SerializedCommand>
 }
 
-fun <C> DataCodec<C, SerializedData>.toCommandCodec(): CommandCodec<C> = CommandCodec(type, this)
+fun interface CommandDecoder<out C> {
+  fun decode(serialized: SerializedCommand): Failable<C>
+}
+
+data class CommandCodec<C>(
+  val encoder: CommandEncoder<C>,
+  val decoder: CommandDecoder<C>,
+) : CommandEncoder<C> by encoder, CommandDecoder<C> by decoder
 
 @JvmInline
-value class CommandCodecRegistry<C>(
-  private val registry: Registry<CommandType, CommandCodec<C>>,
-) : Registry<CommandType, CommandCodec<C>> by registry
+value class CommandCodecRegistry(
+  private val codecs: Registry<CommandType, CommandCodec<*>>,
+) : EpoqueContextValue {
+
+  fun <C> find(type: CommandType): Failable<CommandCodec<C>> =
+    @Suppress("UNCHECKED_CAST")
+    codecs.find(type).map { it as CommandCodec<C> }
+
+  object Key : EpoqueContextKey<CommandCodecRegistry>
+}

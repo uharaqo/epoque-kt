@@ -3,8 +3,6 @@ package io.github.uharaqo.epoque.impl
 import arrow.core.right
 import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.EventWriter
-import io.github.uharaqo.epoque.api.Version
-import io.github.uharaqo.epoque.api.VersionedEvent
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestCommand.Create
 import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.core.spec.style.StringSpec
@@ -28,10 +26,7 @@ class CommandExecutorSpec : StringSpec(
 
       // then
       output.events shouldBe slot.captured.events
-      output.events shouldBe listOf(
-        VersionedEvent(Version(3), dummyEventType, serializedEvent1),
-        VersionedEvent(Version(4), dummyEventType, serializedEvent2),
-      )
+      output.events shouldBe dummyOutputEvents
     }
   },
 ) {

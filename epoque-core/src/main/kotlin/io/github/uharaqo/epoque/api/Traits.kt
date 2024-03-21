@@ -3,6 +3,8 @@ package io.github.uharaqo.epoque.api
 import arrow.core.Either
 import arrow.core.raise.either
 import arrow.core.raise.ensure
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_HANDLER_FAILURE
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_HANDLER_FAILURE
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.SUMMARY_AGGREGATION_FAILURE
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.TIMEOUT_EXCEPTION
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.UNKNOWN_EXCEPTION
@@ -13,7 +15,7 @@ import kotlinx.coroutines.withContext
 
 /** Serialize events by using [EventHandlerRegistry]. */
 interface CanSerializeEvents<E : Any> {
-  val eventCodecRegistry: EventCodecRegistry<E>
+  val eventCodecRegistry: EventCodecRegistry
 
   fun serializeEvents(
     currentVersion: Version,
@@ -28,8 +30,8 @@ interface CanSerializeEvents<E : Any> {
   fun serializeEvent(e: E, version: Version): Failable<VersionedEvent> =
     either {
       val eventType = EventType.of(e::class.java)
-      val codec = eventCodecRegistry.find(eventType).bind()
-      val serialized = codec.serialize(e).bind()
+      val codec = eventCodecRegistry.find<E>(eventType).bind()
+      val serialized = codec.encode(e).bind()
 
       VersionedEvent(version, eventType, serialized)
     }
@@ -46,7 +48,7 @@ interface CanWriteEvents<E : Any> {
  */
 interface CanComputeNextSummary<S, E : Any> : EventHandlerExecutor<S> {
   val eventHandlerRegistry: EventHandlerRegistry<S, E>
-  val eventCodecRegistry: EventCodecRegistry<E>
+  val eventCodecRegistry: EventCodecRegistry
 
   override fun computeNextSummary(
     prevSummary: S,
@@ -54,11 +56,12 @@ interface CanComputeNextSummary<S, E : Any> : EventHandlerExecutor<S> {
     event: SerializedEvent,
   ): Failable<S> = either {
     val eventHandler = eventHandlerRegistry.find(eventType).bind()
+    val codec = eventCodecRegistry.find<E>(eventType).bind()
+    val deserialized = codec.decode(event).bind()
 
-    val codec = eventCodecRegistry.find(eventType).bind()
-    val deserialized = codec.deserialize(event).bind()
-
-    eventHandler.handle(prevSummary, deserialized).bind()
+    Either.catch { eventHandler.handle(prevSummary, deserialized) }
+      .mapLeft { EVENT_HANDLER_FAILURE.toException(it, eventType.toString()) }
+      .bind()
   }
 }
 
@@ -78,7 +81,7 @@ interface CanAggregateEvents<S> {
 
       ensure(currentVersion == ve.version.unwrap) {
         SUMMARY_AGGREGATION_FAILURE.toException(
-          "Event version mismatch. prev: ${currentVersion - 1}, received: ${ve.version}: ${ve.type}",
+          message = "Event version mismatch. prev: ${currentVersion - 1}, received: ${ve.version}: ${ve.type}",
         )
       }
 
@@ -90,11 +93,11 @@ interface CanAggregateEvents<S> {
 }
 
 /**
- * Load events by using [EventLoader] and aggregate them as a summary [S]
+ * Load events by using [EventReader] and aggregate them as a summary [S]
  * as an [CanAggregateEvents].
  */
 interface CanLoadSummary<S> : CanAggregateEvents<S> {
-  val eventLoader: EventLoader
+  val eventReader: EventReader
 
   suspend fun loadSummary(
     key: JournalKey,
@@ -102,7 +105,7 @@ interface CanLoadSummary<S> : CanAggregateEvents<S> {
     cachedSummary: VersionedSummary<S>? = null,
   ): Failable<VersionedSummary<S>> = either {
     val prevVersion = cachedSummary?.version ?: Version.ZERO
-    val events = eventLoader.queryById(key, prevVersion, tx).bind().toList()
+    val events = eventReader.queryById(key, prevVersion, tx).bind().toList()
 
     aggregateEvents(events, cachedSummary).bind()
   }
@@ -152,11 +155,13 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
   ): Failable<CommandOutput> = either {
     val (currentVersion: Version, currentSummary: S) = loadSummary(context.key, tx).bind()
 
-    val events = commandHandler.handle(command, currentSummary).bind()
+    val events =
+      Either.catch { commandHandler.handle(command, currentSummary) }
+        .mapLeft { COMMAND_HANDLER_FAILURE.toException() }.bind()
 
-    val versionedEvents = serializeEvents(currentVersion, events).bind()
+    val versionedEvents = serializeEvents(currentVersion, events.events).bind()
 
-    val output = CommandOutput(versionedEvents, context)
+    val output = CommandOutput(versionedEvents, events.metadata, context)
 
     eventWriter.writeEvents(output, tx).bind()
 
@@ -179,17 +184,18 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
 
 /** Deserialize a command by using [CommandCodec] and execute it by using [CanExecuteCommandHandler]. */
 interface CanProcessCommand<C> : CommandProcessor {
-  val commandCodec: CommandCodec<C>
+  val commandDecoder: CommandDecoder<C>
   val executor: CanExecuteCommandHandler<C, *, *>
 
   override suspend fun process(input: CommandInput): Failable<CommandOutput> =
     either {
-      val command = commandCodec.deserialize(input.payload).bind()
+      val command = commandDecoder.decode(input.payload).bind()
 
       val commandContext = CommandContext(
         key = JournalKey(executor.journalGroupId, input.id),
         commandType = input.type,
         command = input.payload,
+        metadata = input.metadata.asInput(),
         options =
         input.commandExecutorOptions
           ?: executor.defaultCommandExecutorOptions
@@ -200,7 +206,6 @@ interface CanProcessCommand<C> : CommandProcessor {
         EpoqueContext.create()
           .with(CommandContext.Key, commandContext)
           .with(EventCodecRegistry.Key, executor.eventCodecRegistry)
-          .with(CommandCodec.Key, commandCodec)
 
       withContext(coroutineContext + epoqueContext) {
         executor.execute(command, commandContext).bind()

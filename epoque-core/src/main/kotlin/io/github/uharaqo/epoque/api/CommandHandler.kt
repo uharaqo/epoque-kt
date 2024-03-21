@@ -1,13 +1,12 @@
 package io.github.uharaqo.epoque.api
 
 import arrow.core.flatMap
-import io.github.uharaqo.epoque.impl.Registry
 
-interface CommandHandler<C, S, E : Any> {
-  fun handle(command: C, summary: S): Failable<List<E>>
+fun interface CommandHandler<C, S, E : Any> {
+  suspend fun handle(c: C, s: S): CommandHandlerOutput<E>
 }
 
-interface CommandProcessor {
+fun interface CommandProcessor {
   suspend fun process(input: CommandInput): Failable<CommandOutput>
 }
 
@@ -17,6 +16,7 @@ value class CommandProcessorRegistry(
 ) : Registry<CommandType, CommandProcessor> by registry
 
 interface CommandRouter : CommandProcessor {
+  val commandCodecRegistry: CommandCodecRegistry
   val commandProcessorRegistry: CommandProcessorRegistry
 
   override suspend fun process(input: CommandInput): Failable<CommandOutput> =
