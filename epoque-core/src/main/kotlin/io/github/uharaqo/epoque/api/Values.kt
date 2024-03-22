@@ -41,7 +41,7 @@ data class CommandInput(
   val id: JournalId,
   val type: CommandType,
   val payload: SerializedCommand,
-  val metadata: Metadata = Metadata.empty,
+  val metadata: Map<out Any, Any> = emptyMap(),
   val commandExecutorOptions: CommandExecutorOptions? = null,
 )
 

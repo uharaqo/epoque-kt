@@ -13,7 +13,6 @@ import io.github.uharaqo.epoque.api.EventReader
 import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
-import io.github.uharaqo.epoque.api.Metadata
 import io.github.uharaqo.epoque.api.TransactionStarter
 import io.github.uharaqo.epoque.impl.toEventHandlerExecutor
 import io.github.uharaqo.epoque.test.api.CommandTester
@@ -41,7 +40,7 @@ class DefaultCommandTester<S, E : Any>(
   override fun command(
     id: JournalId,
     command: Any,
-    metadata: Metadata,
+    metadata: Map<out Any, Any>,
     block: (Validator<S, E>).() -> Unit,
   ) {
     either {

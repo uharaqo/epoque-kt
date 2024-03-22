@@ -1,8 +1,6 @@
 package io.github.uharaqo.epoque.integration
 
-import io.github.uharaqo.epoque.api.Metadata
 import io.github.uharaqo.epoque.db.jooq.TableDefinition
-import io.github.uharaqo.epoque.impl.DefaultMetadata
 import io.github.uharaqo.epoque.integration.TestEnvironment.RequestId
 import io.github.uharaqo.epoque.integration.epoque.project.CreateProject
 import io.github.uharaqo.epoque.integration.epoque.project.PROJECT_COMMANDS
@@ -34,7 +32,7 @@ class IntegrationSpec : StringSpec(
     }
     val tester = EpoqueTest.newTester(EpoqueTest.newEnvironment(), PROJECT_COMMANDS, TASK_COMMANDS)
 
-    val meta = Metadata.empty + DefaultMetadata(RequestId.Key, RequestId("123"))
+    val meta = mutableMapOf("RequestId" to RequestId("123"))
 
     "Register project" {
       tester.forJournal(PROJECT_JOURNAL) {

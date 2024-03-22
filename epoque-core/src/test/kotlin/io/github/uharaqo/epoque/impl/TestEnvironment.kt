@@ -19,20 +19,19 @@ import io.github.uharaqo.epoque.api.EventStore
 import io.github.uharaqo.epoque.api.EventType
 import io.github.uharaqo.epoque.api.EventWriter
 import io.github.uharaqo.epoque.api.Failable
+import io.github.uharaqo.epoque.api.InputMetadata
 import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.LockOption
-import io.github.uharaqo.epoque.api.Metadata
+import io.github.uharaqo.epoque.api.OutputMetadata
 import io.github.uharaqo.epoque.api.SerializedCommand
 import io.github.uharaqo.epoque.api.SerializedEvent
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.TransactionStarter
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
-import io.github.uharaqo.epoque.api.asInput
-import io.github.uharaqo.epoque.api.asOutput
 import io.github.uharaqo.epoque.serialization.JsonCodec
 import io.github.uharaqo.epoque.serialization.JsonCodecFactory
 import io.github.uharaqo.epoque.serialization.SerializedJson
@@ -94,7 +93,7 @@ abstract class TestEnvironment {
   }
 
   val dummyEvents = listOf(TestEvent.ResourceCreated("1"), TestEvent.ResourceCreated("2"))
-  val dummyOutputMetadata = Metadata.empty.asOutput()
+  val dummyOutputMetadata = OutputMetadata.EMPTY
   val dummyCommandHandlerOutput = CommandHandlerOutput(dummyEvents, dummyOutputMetadata)
   val dummyRecords = listOf(
     VersionedEvent(Version(1), dummyEventType, serializedEvent1),
@@ -150,6 +149,7 @@ abstract class TestEnvironment {
   val dummyCommandCodecRegistry =
     RegistryBuilder<CommandType, CommandCodec<TestCommand>>().apply {
       val codec = JsonCodec.of<TestCommand.Create>().toCommandCodec()
+      @Suppress("UNCHECKED_CAST")
       set(dummyCommandType, codec as CommandCodec<TestCommand>)
     }.build { error(it) }
 
@@ -171,7 +171,7 @@ abstract class TestEnvironment {
     dummyJournalKey,
     dummyCommandType,
     serializedCommand,
-    Metadata.empty.asInput(),
+    InputMetadata.EMPTY,
     CommandExecutorOptions(),
   )
 

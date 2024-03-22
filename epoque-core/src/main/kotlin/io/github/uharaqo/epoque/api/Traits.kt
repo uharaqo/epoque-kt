@@ -195,7 +195,7 @@ interface CanProcessCommand<C> : CommandProcessor {
         key = JournalKey(executor.journalGroupId, input.id),
         commandType = input.type,
         command = input.payload,
-        metadata = input.metadata.asInput(),
+        metadata = input.metadata.asInputMetadata(),
         options =
         input.commandExecutorOptions
           ?: executor.defaultCommandExecutorOptions
