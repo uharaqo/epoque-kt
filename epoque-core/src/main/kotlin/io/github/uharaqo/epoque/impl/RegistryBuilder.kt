@@ -44,4 +44,5 @@ class DefaultRegistry<K : Any, V : Any>(
   override fun find(key: K): Failable<V> = (map[key]?.right()) ?: (onError(key).left())
 
   fun toBuilder() = RegistryBuilder<K, V>(map)
+  override fun toMap(): Map<K, V> = map
 }

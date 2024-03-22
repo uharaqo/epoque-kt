@@ -25,6 +25,7 @@ interface Metadata {
       override fun isEmpty(): Boolean = true
       override fun <T : Any> get(key: Key<T>): T? = null
       override fun plus(other: Metadata): Metadata = other
+      override fun toString(): String = "{}"
     }
   }
 }

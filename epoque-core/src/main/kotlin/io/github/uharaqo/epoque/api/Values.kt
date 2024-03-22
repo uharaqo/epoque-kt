@@ -79,6 +79,8 @@ data class EpoqueEnvironment(
   val callbackHandler: CallbackHandler?,
 )
 
-fun interface Registry<K, V> {
+interface Registry<K : Any, V : Any> {
   fun find(key: K): Failable<V>
+
+  fun toMap(): Map<K, V>
 }

@@ -59,7 +59,7 @@ abstract class TestEnvironment {
     }
   }
 
-  val TEST_COMMANDS = epoqueBuilder.commandRouterFactoryFor<TestCommand, _, _>(TEST_JOURNAL) {
+  val TEST_COMMANDS = epoqueBuilder.routerFor<TestCommand, _, _>(TEST_JOURNAL) {
     commandHandlerFor<TestCommand.Create> { c, s ->
       emit(dummyEvents)
     }

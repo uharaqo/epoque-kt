@@ -157,7 +157,7 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
 
     val events =
       Either.catch { commandHandler.handle(command, currentSummary) }
-        .mapLeft { COMMAND_HANDLER_FAILURE.toException() }.bind()
+        .mapLeft { COMMAND_HANDLER_FAILURE.toException(it) }.bind()
 
     val versionedEvents = serializeEvents(currentVersion, events.events).bind()
 

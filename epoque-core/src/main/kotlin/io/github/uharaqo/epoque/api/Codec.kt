@@ -100,5 +100,7 @@ value class CommandCodecRegistry(
     @Suppress("UNCHECKED_CAST")
     codecs.find(type).map { it as CommandCodec<C> }
 
+  fun toMap(): Map<CommandType, CommandCodec<*>> = codecs.toMap()
+
   object Key : EpoqueContextKey<CommandCodecRegistry>
 }

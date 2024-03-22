@@ -2,6 +2,7 @@ package io.github.uharaqo.epoque.impl
 
 import arrow.core.getOrElse
 import arrow.core.raise.Raise
+import io.github.uharaqo.epoque.api.CommandHandler
 import io.github.uharaqo.epoque.api.CommandHandlerOutput
 import io.github.uharaqo.epoque.api.EpoqueException
 import io.github.uharaqo.epoque.api.Journal
@@ -22,15 +23,23 @@ interface CommandHandlerBuilder<C, S, E> : Raise<Throwable> {
   fun reject(message: String, t: Throwable? = null): Nothing =
     throw EpoqueException.Cause.COMMAND_REJECTED.toException(t, message)
 
-  suspend fun exists(journal: Journal<*, *>, id: String): Boolean =
-    exists(JournalKey(journal.journalGroupId, JournalId(id)))
+  suspend fun exists(journal: Journal<*, *>, id: String?): Boolean =
+    if (id == null) false else exists(JournalKey(journal.journalGroupId, JournalId(id)))
 
   suspend fun exists(key: JournalKey): Boolean
 
   override fun raise(r: Throwable): Nothing = throw r
 }
 
-class DefaultCommandHandlerBuilder<C, S, E>(
+class DefaultCommandHandler<C : Any, S, E : Any>(
+  private val impl: suspend CommandHandlerBuilder<C, S, E>.(C, S) -> Unit,
+  private val runtimeEnvFactory: () -> CommandHandlerRuntimeEnvironment<C, S, E>,
+) : CommandHandler<C, S, E> {
+  override suspend fun handle(c: C, s: S): CommandHandlerOutput<E> =
+    runtimeEnvFactory().apply { impl(c, s) }.complete()
+}
+
+class CommandHandlerRuntimeEnvironment<C, S, E>(
   private val journalChecker: JournalChecker,
 ) : CommandHandlerBuilder<C, S, E> {
   private val events = ConcurrentLinkedQueue<E>()

@@ -7,4 +7,6 @@ rootProject.name = "epoque-kt"
 include(
   "epoque-core",
   "epoque-db-jooq",
+  "epoque-test",
+  "integration-test",
 )
