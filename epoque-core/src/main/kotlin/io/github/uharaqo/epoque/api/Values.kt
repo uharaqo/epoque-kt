@@ -51,7 +51,7 @@ data class CommandContext(
   val command: SerializedCommand,
   val metadata: InputMetadata,
   val options: CommandExecutorOptions,
-) : EpoqueContextValue {
+) {
   object Key : EpoqueContextKey<CommandContext>
 }
 

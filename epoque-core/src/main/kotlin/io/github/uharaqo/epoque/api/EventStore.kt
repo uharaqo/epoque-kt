@@ -2,7 +2,7 @@ package io.github.uharaqo.epoque.api
 
 import kotlinx.coroutines.flow.Flow
 
-interface TransactionContext : EpoqueContextValue {
+interface TransactionContext {
   val lockOption: LockOption
   val lockedKeys: Set<JournalKey>
 
