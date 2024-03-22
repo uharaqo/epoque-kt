@@ -19,8 +19,6 @@ interface JournalBuilder<S, E : Any> {
   ): JournalBuilder<S, E>
 
   fun build(): Journal<S, E>
-
-  companion object
 }
 
 class DefaultJournalBuilder<S, E : Any>(
