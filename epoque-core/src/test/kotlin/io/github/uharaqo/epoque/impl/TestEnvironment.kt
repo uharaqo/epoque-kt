@@ -185,12 +185,12 @@ abstract class TestEnvironment {
       log.info("> AfterBegin: $context")
     }
 
-    override suspend fun beforeCommit(context: CommandContext, output: CommandOutput) {
-      log.info("> BeforeCommit: $context, $output")
+    override suspend fun beforeCommit(output: CommandOutput) {
+      log.info("> BeforeCommit: $output")
     }
 
-    override suspend fun afterCommit(context: CommandContext, output: CommandOutput) {
-      log.info("> AfterCommit: $context, $output")
+    override suspend fun afterCommit(output: CommandOutput) {
+      log.info("> AfterCommit: $output")
     }
 
     override suspend fun afterRollback(context: CommandContext, error: Throwable) {
