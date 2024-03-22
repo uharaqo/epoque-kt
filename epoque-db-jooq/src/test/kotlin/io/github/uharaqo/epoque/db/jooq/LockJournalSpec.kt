@@ -7,17 +7,17 @@ import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.EpoqueException
 import io.github.uharaqo.epoque.api.EventStore
 import io.github.uharaqo.epoque.api.EventType
+import io.github.uharaqo.epoque.api.InputMetadata
 import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.LockOption
-import io.github.uharaqo.epoque.api.Metadata
+import io.github.uharaqo.epoque.api.OutputMetadata
 import io.github.uharaqo.epoque.api.SerializedCommand
 import io.github.uharaqo.epoque.api.SerializedEvent
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
-import io.github.uharaqo.epoque.api.asInput
-import io.github.uharaqo.epoque.api.asOutput
+import io.github.uharaqo.epoque.db.jooq.JooqUtil.toEventStore
 import io.github.uharaqo.epoque.serialization.SerializedJson
 import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.assertions.throwables.shouldThrow
@@ -25,21 +25,16 @@ import io.kotest.common.runBlocking
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.throwable.shouldHaveMessage
-import java.sql.DriverManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withContext
-import org.jooq.DSLContext
-import org.jooq.JSONB
-import org.jooq.SQLDialect
-import org.jooq.impl.DSL
 import org.slf4j.LoggerFactory
 
 class LockJournalSpec : StringSpec(
   {
-    val ctx = newDslContext().also {
+    val ctx = JooqUtil.newH2DslContext().also {
       autoClose(it.configuration().connectionProvider().acquire()!!)
     }
     val store = ctx.toEventStore()
@@ -154,7 +149,7 @@ class LockJournalSpec : StringSpec(
       key1,
       CommandType.of<String>(),
       SerializedCommand(SerializedJson("{}")),
-      Metadata.empty.asInput(),
+      InputMetadata.EMPTY,
       CommandExecutorOptions(),
     )
     val event1 = VersionedEvent(
@@ -168,11 +163,11 @@ class LockJournalSpec : StringSpec(
       SerializedEvent(SerializedJson("{}")),
     )
     val output =
-      CommandOutput(listOf(event1, event2), Metadata.empty.asOutput(), dummyCommandContext)
+      CommandOutput(listOf(event1, event2), OutputMetadata.EMPTY, dummyCommandContext)
 
     private suspend fun withConcurrentConnections(f: suspend (EventStore, EventStore) -> Unit) {
-      val ctx1 = newDslContext()
-      val ctx2 = newDslContext()
+      val ctx1 = JooqUtil.newH2DslContext()
+      val ctx2 = JooqUtil.newH2DslContext()
       val store1 = ctx1.toEventStore()
       val store2 = ctx2.toEventStore()
       try {
@@ -182,18 +177,5 @@ class LockJournalSpec : StringSpec(
         ctx2.configuration().connectionProvider().acquire()!!.close()
       }
     }
-
-    private fun DSLContext.toEventStore(): JooqEventStore<JSONB> =
-      JooqEventStore(this, H2JooqQueries(tableDefinition))
-
-    private fun newDslContext(): DSLContext =
-      DSL.using(
-        DriverManager.getConnection(
-          "jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=TRUE",
-          "sa",
-          "",
-        ).also { it.autoCommit = false },
-        SQLDialect.H2,
-      )
   }
 }

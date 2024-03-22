@@ -44,9 +44,7 @@ class JournalSpec : StringSpec(
       val codec = dummyCommandCodecRegistry.find(dummyCommandType).rethrow()
       val processor: CommandProcessor =
         Epoque
-          .commandRouterFactoryFor<TestCommand, TestSummary, TestEvent>(
-            TEST_JOURNAL, jsonCodecFactory,
-          ) {
+          .routerFor<TestCommand, TestSummary, TestEvent>(TEST_JOURNAL, jsonCodecFactory) {
             commandHandlerFor<TestCommand.Create> { c, s ->
               emit(dummyEvents)
             }

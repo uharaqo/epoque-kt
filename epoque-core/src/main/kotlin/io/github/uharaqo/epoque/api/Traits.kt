@@ -157,7 +157,7 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
 
     val events =
       Either.catch { commandHandler.handle(command, currentSummary) }
-        .mapLeft { COMMAND_HANDLER_FAILURE.toException() }.bind()
+        .mapLeft { COMMAND_HANDLER_FAILURE.toException(it) }.bind()
 
     val versionedEvents = serializeEvents(currentVersion, events.events).bind()
 
@@ -195,7 +195,7 @@ interface CanProcessCommand<C> : CommandProcessor {
         key = JournalKey(executor.journalGroupId, input.id),
         commandType = input.type,
         command = input.payload,
-        metadata = input.metadata.asInput(),
+        metadata = input.metadata.asInputMetadata(),
         options =
         input.commandExecutorOptions
           ?: executor.defaultCommandExecutorOptions

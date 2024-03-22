@@ -41,7 +41,7 @@ data class CommandInput(
   val id: JournalId,
   val type: CommandType,
   val payload: SerializedCommand,
-  val metadata: Metadata = Metadata.empty,
+  val metadata: Map<out Any, Any> = emptyMap(),
   val commandExecutorOptions: CommandExecutorOptions? = null,
 )
 
@@ -51,7 +51,7 @@ data class CommandContext(
   val command: SerializedCommand,
   val metadata: InputMetadata,
   val options: CommandExecutorOptions,
-) : EpoqueContextValue {
+) {
   object Key : EpoqueContextKey<CommandContext>
 }
 
@@ -79,6 +79,8 @@ data class EpoqueEnvironment(
   val callbackHandler: CallbackHandler?,
 )
 
-fun interface Registry<K, V> {
+interface Registry<K : Any, V : Any> {
   fun find(key: K): Failable<V>
+
+  fun toMap(): Map<K, V>
 }

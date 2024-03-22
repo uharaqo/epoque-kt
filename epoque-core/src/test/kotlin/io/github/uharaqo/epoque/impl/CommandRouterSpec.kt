@@ -15,9 +15,7 @@ class CommandRouterSpec : StringSpec(
       // given
       val commandRouter =
         Epoque
-          .commandRouterFactoryFor<TestCommand, TestSummary, TestEvent>(
-            TEST_JOURNAL, jsonCodecFactory,
-          ) {
+          .routerFor<TestCommand, TestSummary, TestEvent>(TEST_JOURNAL, jsonCodecFactory) {
             commandHandlerFor<TestCommand.Create> { command, summary ->
               emit(dummyEvents)
             }

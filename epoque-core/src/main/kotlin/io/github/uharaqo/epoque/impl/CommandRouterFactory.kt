@@ -18,6 +18,30 @@ fun interface CommandRouterFactory {
   fun create(environment: EpoqueEnvironment): CommandRouter
 }
 
+fun CommandRouter.Companion.fromFactories(
+  environment: EpoqueEnvironment,
+  vararg factories: CommandRouterFactory,
+): CommandRouter =
+  fromFactories(environment, factories.toList())
+
+fun CommandRouter.Companion.fromFactories(
+  environment: EpoqueEnvironment,
+  factories: List<CommandRouterFactory>,
+): CommandRouter {
+  if (factories.isEmpty()) error("No CommandRouterFactory is provided")
+
+  val routers = factories.map { it.create(environment) }
+  val codecs = buildMap { routers.forEach { putAll(it.commandCodecRegistry.toMap()) } }
+  val processors = buildMap { routers.forEach { putAll(it.commandProcessorRegistry.toMap()) } }
+  val onError =
+    { type: CommandType -> COMMAND_NOT_SUPPORTED.toException(message = type.toString()) }
+
+  return DefaultCommandRouter(
+    CommandCodecRegistry(DefaultRegistry(codecs, onError)),
+    CommandProcessorRegistry(DefaultRegistry(processors, onError)),
+  )
+}
+
 fun interface TypedCommandProcessorFactory<C : Any, S, E : Any> {
   fun create(environment: EpoqueEnvironment): TypedCommandProcessor<C>
 }
@@ -54,37 +78,6 @@ class DefaultCommandRouterFactory<C : Any, S, E : Any>(
       ),
     )
   }
-
-  companion object {
-    fun mergeAll(vararg factories: DefaultCommandRouterFactory<*, *, *>): CommandRouterFactory =
-      mergeAll(factories.toList())
-
-    fun mergeAll(factories: List<DefaultCommandRouterFactory<*, *, *>>): CommandRouterFactory {
-      if (factories.isEmpty()) error("No CommandRouterFactory is provided")
-
-      val processors: MutableMap<CommandType, TypedCommandProcessorFactory<out Any, out Any?, out Any>> =
-        factories.fold(mutableMapOf()) { acc, f ->
-          acc.also { it.putAll(f.commandProcessorRegistryBuilder.buildIntoMap()) }
-        }
-
-      val codecs: MutableMap<CommandType, CommandCodec<out Any?>> =
-        factories.fold(mutableMapOf()) { acc, f ->
-          acc.also { it.putAll(f.commandCodecRegistryBuilder.buildIntoMap()) }
-        }
-
-      val onError =
-        { type: CommandType -> COMMAND_NOT_SUPPORTED.toException(message = type.toString()) }
-
-      return CommandRouterFactory { env ->
-        DefaultCommandRouter(
-          CommandCodecRegistry(DefaultRegistry(codecs, onError)),
-          CommandProcessorRegistry(
-            DefaultRegistry(processors.mapValues { it.value.create(env) }, onError),
-          ),
-        )
-      }
-    }
-  }
 }
 
 class DefaultCommandRouter(
@@ -100,13 +93,11 @@ class CommandRouterFactoryBuilder<C : Any, S, E : Any>(
 
   /** [CC]: Concrete type of the command */
   inline fun <reified CC : C> commandHandlerFor(
-    noinline handle: suspend CommandHandlerBuilder<CC, S, E>.(CC, S) -> Unit,
+    noinline handle: suspend CommandHandlerBuilder<CC, S, E>.(c: CC, s: S) -> Unit,
   ): CommandRouterFactoryBuilder<C, S, E> {
     val handlerFactory = { env: EpoqueEnvironment ->
-      val journalChecker = env.eventReader
-      val builder = DefaultCommandHandlerBuilder<CC, S, E>(journalChecker)
-
-      CommandHandler<CC, S, E> { c, s -> builder.also { it.handle(c, s) }.complete() }
+      val journalChecker = env.eventReader // cached
+      DefaultCommandHandler(handle) { CommandHandlerRuntimeEnvironment(journalChecker) }
     }
     val codec = codecFactory.codecFor<CC>()
 

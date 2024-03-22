@@ -8,20 +8,20 @@ import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CoroutineScope
 
 class EpoqueContext private constructor(
-  private val map: Map<EpoqueContextKey<*>, EpoqueContextValue>,
+  private val map: Map<EpoqueContextKey<*>, Any>,
 ) : CoroutineContext.Element {
 
   override val key = Key
 
-  operator fun <V : EpoqueContextValue> get(key: EpoqueContextKey<V>): V? =
+  operator fun <V> get(key: EpoqueContextKey<V>): V? =
     @Suppress("UNCHECKED_CAST")
     map[key]?.let { it as V }
 
-  fun <V : EpoqueContextValue> with(key: EpoqueContextKey<V>, value: V): EpoqueContext =
-    EpoqueContext(map + (key to value))
+  fun <V> with(key: EpoqueContextKey<V>, value: V): EpoqueContext =
+    EpoqueContext(map + (key to value as Any))
 
   @OptIn(ExperimentalContracts::class)
-  suspend fun <T, V : EpoqueContextValue> withContext(
+  suspend fun <T, V> withContext(
     key: EpoqueContextKey<V>,
     value: V,
     block: suspend CoroutineScope.() -> T,
@@ -42,8 +42,6 @@ class EpoqueContext private constructor(
   }
 }
 
-interface EpoqueContextKey<out V : EpoqueContextValue> {
+interface EpoqueContextKey<out V> {
   suspend fun get(): V? = coroutineContext[EpoqueContext.Key]?.let { it[this] }
 }
-
-interface EpoqueContextValue

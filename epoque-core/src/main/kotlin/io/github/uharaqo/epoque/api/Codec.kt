@@ -54,7 +54,7 @@ data class EventCodec<E>(
 @JvmInline
 value class EventCodecRegistry(
   private val codecs: Registry<EventType, EventCodec<*>>,
-) : EpoqueContextValue {
+) {
 
   fun <E> find(type: EventType): Failable<EventCodec<E>> =
     @Suppress("UNCHECKED_CAST")
@@ -94,11 +94,13 @@ data class CommandCodec<C>(
 @JvmInline
 value class CommandCodecRegistry(
   private val codecs: Registry<CommandType, CommandCodec<*>>,
-) : EpoqueContextValue {
+) {
 
   fun <C> find(type: CommandType): Failable<CommandCodec<C>> =
     @Suppress("UNCHECKED_CAST")
     codecs.find(type).map { it as CommandCodec<C> }
+
+  fun toMap(): Map<CommandType, CommandCodec<*>> = codecs.toMap()
 
   object Key : EpoqueContextKey<CommandCodecRegistry>
 }

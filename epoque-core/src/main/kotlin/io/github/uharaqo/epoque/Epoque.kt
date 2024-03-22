@@ -27,13 +27,13 @@ object Epoque {
   ): Journal<S, E> =
     EpoqueBuilder<E>(journalGroupId, dataCodecFactory).summaryFor(emptySummary, block)
 
-  fun <C : Any, S, E : Any> commandRouterFactoryFor(
+  fun <C : Any, S, E : Any> routerFor(
     journal: Journal<S, E>,
     dataCodecFactory: DataCodecFactory,
     block: CommandRouterFactoryBuilder<C, S, E>.() -> Unit,
   ): CommandRouterFactory =
     EpoqueBuilder<E>(journal.journalGroupId, dataCodecFactory)
-      .commandRouterFactoryFor(journal, block as CommandRouterFactoryBuilder<C, *, *>.() -> Unit)
+      .routerFor(journal, block as CommandRouterFactoryBuilder<C, *, *>.() -> Unit)
 }
 
 data class EpoqueBuilder<E : Any>(
@@ -46,7 +46,7 @@ data class EpoqueBuilder<E : Any>(
   ): Journal<S, E> =
     DefaultJournalBuilder<S, E>(journalGroupId, emptySummary, dataCodecFactory).apply(block).build()
 
-  fun <C : Any, S, E : Any> commandRouterFactoryFor(
+  fun <C : Any, S, E : Any> routerFor(
     journal: Journal<S, E>,
     block: CommandRouterFactoryBuilder<C, S, E>.() -> Unit,
   ): CommandRouterFactory =

@@ -9,11 +9,13 @@ kotlin-ktlint = "11.6.1"
 # db
 jooq = "3.19.3"
 jooq-gradle-plugin = "8.2"
+h2 = "2.2.224"
 postgres-driver = "42.7.1"
 mysql-driver = "8.0.33"
 hikaricp = "5.1.0"
 
 # util
+slf4j = "2.0.12"
 arrow = "1.2.1"
 protobuf = "3.25.2"
 
@@ -29,18 +31,19 @@ testcontainers-mysql = "1.19.5"
 logback = "1.4.14"
 
 [libraries]
+# plugins
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 spotless-plugin-gradle = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
+ktlint-plugin = { module = "org.jlleitschuh.gradle.ktlint:org.jlleitschuh.gradle.ktlint.gradle.plugin", version.ref = "kotlin-ktlint" }
+ktlint-idea-plugin = { module = "org.jlleitschuh.gradle.ktlint-idea:org.jlleitschuh.gradle.ktlint-idea.gradle.plugin", version.ref = "kotlin-ktlint" }
 arrow-optics-ksp-plugin = { module = "io.arrow-kt:arrow-optics-ksp-plugin", version.ref = "arrow" }
 
+# kotlin
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlin-coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlin-serialization" }
-jooq-kotlin = { module = "org.jooq:jooq-kotlin", version.ref = "jooq" }
-jooq-kotlin-coroutines = { module = "org.jooq:jooq-kotlin-coroutines", version.ref = "jooq" }
-postgres = { module = "org.postgresql:postgresql", version.ref = "postgres-driver" }
-mysql = { module = "mysql:mysql-connector-java", version.ref = "mysql-driver" }
 
-hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
+# util
+slf4j = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 
 arrow-core = { module = "io.arrow-kt:arrow-core", version.ref = "arrow" }
 arrow-optics = { module = "io.arrow-kt:arrow-optics", version.ref = "arrow" }
@@ -51,6 +54,15 @@ protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "p
 protobuf-java-util = { module = "com.google.protobuf:protobuf-java-util", version.ref = "protobuf" }
 protoc = { module = "com.google.protobuf:protoc", version.ref = "protobuf" }
 
+# db
+jooq-kotlin = { module = "org.jooq:jooq-kotlin", version.ref = "jooq" }
+jooq-kotlin-coroutines = { module = "org.jooq:jooq-kotlin-coroutines", version.ref = "jooq" }
+h2 = { module = "com.h2database:h2", version.ref = "h2" }
+postgres = { module = "org.postgresql:postgresql", version.ref = "postgres-driver" }
+mysql = { module = "mysql:mysql-connector-java", version.ref = "mysql-driver" }
+hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
+
+# test
 kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
 kotest-assertions-core = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
 kotest-assertions-arrow = { module = "io.kotest.extensions:kotest-assertions-arrow", version.ref = "kotest-arrow" }
@@ -59,9 +71,6 @@ kotest-extensions-testcontainers = { module = "io.kotest.extensions:kotest-exten
 testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers-postgres" }
 testcontainers-mysql = { module = "org.testcontainers:mysql", version.ref = "testcontainers-mysql" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
-
-ktlint-plugin = { module = "org.jlleitschuh.gradle.ktlint:org.jlleitschuh.gradle.ktlint.gradle.plugin", version.ref = "kotlin-ktlint" }
-ktlint-idea-plugin = { module = "org.jlleitschuh.gradle.ktlint-idea:org.jlleitschuh.gradle.ktlint-idea.gradle.plugin", version.ref = "kotlin-ktlint" }
 
 [bundles]
 
