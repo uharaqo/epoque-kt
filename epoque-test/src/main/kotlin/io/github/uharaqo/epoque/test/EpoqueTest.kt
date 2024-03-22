@@ -1,5 +1,6 @@
 package io.github.uharaqo.epoque.test
 
+import io.github.uharaqo.epoque.api.CallbackHandler
 import io.github.uharaqo.epoque.api.CommandExecutorOptions
 import io.github.uharaqo.epoque.api.CommandRouter
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
@@ -18,6 +19,9 @@ import java.sql.DriverManager
 import org.jooq.DSLContext
 import org.jooq.JSONB
 import org.jooq.SQLDialect
+import org.jooq.conf.RenderNameCase
+import org.jooq.conf.RenderQuotedNames
+import org.jooq.conf.Settings
 import org.jooq.impl.DSL
 
 object EpoqueTest {
@@ -29,7 +33,15 @@ object EpoqueTest {
     )
       .also { it.autoCommit = false }
       .also { Runtime.getRuntime().addShutdownHook(Thread { it.close() }) }
-      .let { DSL.using(it, SQLDialect.H2) }
+      .let {
+        DSL.using(
+          it,
+          SQLDialect.H2,
+          Settings()
+            .withRenderNameCase(RenderNameCase.UPPER)
+            .withRenderQuotedNames(RenderQuotedNames.ALWAYS),
+        )
+      }
 
   fun newH2EventStore() = newH2JooqContext().toH2EventStore()
 
@@ -42,8 +54,9 @@ object EpoqueTest {
       timeoutMillis = 30000,
       lockOption = LOCK_JOURNAL,
     ),
+    callbackHandler: CallbackHandler = DebugLogger(),
   ): EpoqueEnvironment =
-    EpoqueEnvironment(eventStore, eventStore, eventStore, options, DebugLogger())
+    EpoqueEnvironment(eventStore, eventStore, eventStore, options, callbackHandler)
 
   fun newTester(
     environment: EpoqueEnvironment,

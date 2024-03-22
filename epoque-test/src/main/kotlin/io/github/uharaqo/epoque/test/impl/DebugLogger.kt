@@ -16,11 +16,11 @@ class DebugLogger : CallbackHandler {
     if (logger.isDebugEnabled) logger.debug("> AfterBegin")
   }
 
-  override suspend fun beforeCommit(context: CommandContext, output: CommandOutput) {
+  override suspend fun beforeCommit(output: CommandOutput) {
     if (logger.isDebugEnabled) logger.debug("> BeforeCommit: $output")
   }
 
-  override suspend fun afterCommit(context: CommandContext, output: CommandOutput) {
+  override suspend fun afterCommit(output: CommandOutput) {
     if (logger.isDebugEnabled) logger.debug("> AfterCommit")
   }
 

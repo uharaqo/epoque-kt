@@ -1,13 +1,13 @@
 package io.github.uharaqo.epoque.api
 
-data class ProjectionEvent(
+data class ProjectionEvent<E>(
   val key: JournalKey,
-  val event: VersionedEvent,
+  val version: Version,
+  val event: E,
 )
 
-fun CommandOutput.toProjectionEvents(): List<ProjectionEvent> =
-  events.map { event -> ProjectionEvent(context.key, event) }
+interface Projection<E> {
+  val eventCodec: EventCodec<E>
 
-interface Projection {
-  suspend fun process(event: ProjectionEvent, tx: TransactionContext)
+  suspend fun process(event: ProjectionEvent<E>, tx: TransactionContext)
 }
