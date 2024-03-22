@@ -8,6 +8,7 @@ import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_HANDLER_FAILURE
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.SUMMARY_AGGREGATION_FAILURE
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.TIMEOUT_EXCEPTION
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.UNKNOWN_EXCEPTION
+import java.time.Instant
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.toList
@@ -140,11 +141,11 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
           callbackHandler?.afterBegin(context)
 
           execute(command, commandHandler, context, tx).bind()
-            .also { callbackHandler?.beforeCommit(context, it) }
+            .also { callbackHandler?.beforeCommit(it) }
         }.bind()
       }.bind()
     }
-      .onRight { callbackHandler?.afterCommit(context, it) }
+      .onRight { callbackHandler?.afterCommit(it) }
       .onLeft { callbackHandler?.afterRollback(context, it) }
 
   suspend fun execute(
@@ -206,9 +207,12 @@ interface CanProcessCommand<C> : CommandProcessor {
         EpoqueContext.create()
           .with(CommandContext.Key, commandContext)
           .with(EventCodecRegistry.Key, executor.eventCodecRegistry)
+          .with(ReceivedTime, Instant.now())
 
       withContext(coroutineContext + epoqueContext) {
         executor.execute(command, commandContext).bind()
       }
     }
 }
+
+object ReceivedTime : EpoqueContextKey<Instant>

@@ -1,15 +1,15 @@
 package io.github.uharaqo.epoque.integration.epoque.task
 
 import io.github.uharaqo.epoque.Epoque
-import io.github.uharaqo.epoque.integration.Utils
 import io.github.uharaqo.epoque.integration.epoque.project.PROJECT_JOURNAL
+import io.github.uharaqo.epoque.serialization.JsonCodecFactory
 
 sealed interface Task {
   data object Empty : Task
   data class Default(val started: Boolean) : Task
 }
 
-private val builder = Epoque.journalFor<TaskEvent>(Utils.codecFactory)
+private val builder = Epoque.journalFor<TaskEvent>(JsonCodecFactory())
 
 val TASK_JOURNAL = builder.summaryFor<Task>(Task.Empty) {
   eventHandlerFor<TaskCreated> { s, e ->

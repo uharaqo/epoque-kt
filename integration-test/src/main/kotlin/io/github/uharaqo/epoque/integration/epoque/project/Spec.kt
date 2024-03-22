@@ -1,7 +1,7 @@
 package io.github.uharaqo.epoque.integration.epoque.project
 
 import io.github.uharaqo.epoque.Epoque
-import io.github.uharaqo.epoque.integration.Utils
+import io.github.uharaqo.epoque.serialization.JsonCodecFactory
 
 sealed interface Project {
   data object Empty : Project
@@ -9,7 +9,7 @@ sealed interface Project {
   data object Default : Project
 }
 
-private val builder = Epoque.journalFor<ProjectEvent>(Utils.codecFactory)
+private val builder = Epoque.journalFor<ProjectEvent>(JsonCodecFactory())
 
 val PROJECT_JOURNAL = builder.summaryFor<Project>(Project.Empty) {
   eventHandlerFor<ProjectCreated> { s, e ->
