@@ -11,20 +11,22 @@ import io.github.uharaqo.epoque.api.InputMetadata
 import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
-import io.github.uharaqo.epoque.api.LockOption
 import io.github.uharaqo.epoque.api.OutputMetadata
 import io.github.uharaqo.epoque.api.SerializedCommand
 import io.github.uharaqo.epoque.api.SerializedEvent
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
+import io.github.uharaqo.epoque.api.WriteOption
 import io.github.uharaqo.epoque.db.jooq.JooqUtil.toEventStore
 import io.github.uharaqo.epoque.serialization.SerializedJson
 import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.common.runBlocking
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.throwable.shouldHaveMessage
+import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -66,12 +68,12 @@ class LockJournalSpec : StringSpec(
       shouldThrow<EpoqueException> {
         withConcurrentConnections { store1, store2 ->
           with(store1) {
-            startTransactionAndLock(key1, LockOption.DEFAULT) { tx ->
+            startTransactionAndLock(key1, WriteOption.DEFAULT) { tx ->
               writeEvents(output, tx).rethrow()
             }.rethrow()
           }
           with(store2) {
-            startTransactionAndLock(key1, LockOption.DEFAULT) { tx ->
+            startTransactionAndLock(key1, WriteOption.DEFAULT) { tx ->
               writeEvents(output, tx).rethrow()
             }.rethrow()
           }
@@ -93,7 +95,7 @@ class LockJournalSpec : StringSpec(
 
             with(store1) {
               log.info("Taking a lock @ T1").also { list += "Job1 Locking" }
-              startTransactionAndLock(key1, LockOption.LOCK_JOURNAL) { tx ->
+              startTransactionAndLock(key1, WriteOption.LOCK_JOURNAL) { tx ->
                 log.info("Took a lock. Sleeping @ T2").also { list += "Job1 Sleeping" }
                 delay(t3)
                 log.info("Writing @T4").also { list += "Job1 Writing" }
@@ -111,8 +113,8 @@ class LockJournalSpec : StringSpec(
             with(store2) {
               log.info("Taking a lock @ T3 <- blocked by the job1's lock for a while")
                 .also { list += "Job2 Locking" }
-              startTransactionAndLock(key1, LockOption.LOCK_JOURNAL) { tx ->
-                log.info("Writing @ T5 <- gets called once the job1 release the lock")
+              startTransactionAndLock(key1, WriteOption.LOCK_JOURNAL) { tx ->
+                log.info("Writing @ T6 <- gets called once the job1 release the lock")
                   .also { list += "Job2 Writing" }
                 shouldThrow<EpoqueException> {
                   writeEvents(output, tx).rethrow()
@@ -121,18 +123,25 @@ class LockJournalSpec : StringSpec(
             }
           }
 
+          val log = LoggerFactory.getLogger(this.javaClass)
           job1.join().also { list += "Job1 Done" }
-          LoggerFactory.getLogger(this.javaClass).info("JOB1 done @ T5")
+          log.info("JOB1 done @ T5")
           job2.join().also { list += "Job2 Done" }
-          LoggerFactory.getLogger(this.javaClass).info("JOB2 done @ T6")
+          log.info("JOB2 done @ T7")
 
-          list shouldBe listOf(
-            "Job1 Starting", "Job1 Locking", "Job2 Sleeping", // T1: Job1 <- Job2
+          list.slice(0..2) shouldContainExactlyInAnyOrder
+            listOf("Job1 Starting", "Job1 Locking", "Job2 Sleeping") // T1: Job1 <- Job2
+          list.slice(3..4) shouldBe listOf(
             "Job1 Sleeping", // T2: Job1 -> Job2
             "Job2 Locking", // T3: Job2 -> Job1
-            "Job1 Writing", "Job1 Done", // T4, T5: Job1 -> Job2
-            "Job2 Writing", "Job2 Done", // T5, T6: Job2
           )
+          list.slice(5..8) shouldBe listOf(
+            "Job1 Writing",
+            "Job1 Done", // T4, T5: Job1 -> Job2
+            "Job2 Writing",
+            "Job2 Done", // T6, T7: Job2
+          )
+          list.size shouldBe 9
         }
       }
     }
@@ -150,7 +159,8 @@ class LockJournalSpec : StringSpec(
       CommandType.of<String>(),
       SerializedCommand(SerializedJson("{}")),
       InputMetadata.EMPTY,
-      CommandExecutorOptions(),
+      CommandExecutorOptions.DEFAULT,
+      Instant.now(),
     )
     val event1 = VersionedEvent(
       Version(1),

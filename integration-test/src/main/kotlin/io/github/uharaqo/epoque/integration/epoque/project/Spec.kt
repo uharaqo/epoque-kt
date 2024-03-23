@@ -19,7 +19,7 @@ val PROJECT_JOURNAL = builder.summaryFor<Project>(Project.Empty) {
   }
 }
 
-val PROJECT_COMMANDS = builder.routerFor<ProjectCommand, Project, ProjectEvent>(PROJECT_JOURNAL) {
+val PROJECT_COMMANDS = builder.with(PROJECT_JOURNAL).routerFor<ProjectCommand> {
   commandHandlerFor<CreateProject> { c, s ->
     if (s is Project.Empty) {
       chain("Foo", CreateTask("TaskX"))

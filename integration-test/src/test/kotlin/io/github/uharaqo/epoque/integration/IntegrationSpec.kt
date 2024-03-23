@@ -1,6 +1,6 @@
 package io.github.uharaqo.epoque.integration
 
-import io.github.uharaqo.epoque.impl.ProjectionRegistry
+import io.github.uharaqo.epoque.builder.ProjectionRegistry
 import io.github.uharaqo.epoque.integration.TestEnvironment.RequestId
 import io.github.uharaqo.epoque.integration.epoque.project.CreateProject
 import io.github.uharaqo.epoque.integration.epoque.project.PROJECT_COMMANDS

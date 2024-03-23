@@ -78,8 +78,12 @@ data class CommandOutput(
 
 data class CommandExecutorOptions(
   val timeoutMillis: Long = 5000L,
-  val lockOption: LockOption = LockOption.DEFAULT,
-)
+  val writeOption: WriteOption = WriteOption.DEFAULT,
+) {
+  companion object {
+    val DEFAULT = CommandExecutorOptions()
+  }
+}
 
 data class EpoqueEnvironment(
   val eventReader: EventReader,

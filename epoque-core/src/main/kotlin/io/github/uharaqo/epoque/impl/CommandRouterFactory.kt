@@ -2,20 +2,24 @@ package io.github.uharaqo.epoque.impl
 
 import io.github.uharaqo.epoque.api.CommandCodec
 import io.github.uharaqo.epoque.api.CommandCodecRegistry
+import io.github.uharaqo.epoque.api.CommandHandler
+import io.github.uharaqo.epoque.api.CommandHandlerOutput
 import io.github.uharaqo.epoque.api.CommandProcessor
 import io.github.uharaqo.epoque.api.CommandProcessorRegistry
 import io.github.uharaqo.epoque.api.CommandRouter
 import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.DataCodec
-import io.github.uharaqo.epoque.api.DataCodecFactory
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_NOT_SUPPORTED
 import io.github.uharaqo.epoque.api.Journal
-import io.github.uharaqo.epoque.api.codecFor
-
-fun interface CommandRouterFactory {
-  fun create(environment: EpoqueEnvironment): CommandRouter
-}
+import io.github.uharaqo.epoque.api.JournalChecker
+import io.github.uharaqo.epoque.builder.CommandProcessorFactory
+import io.github.uharaqo.epoque.builder.CommandRouterFactory
+import io.github.uharaqo.epoque.builder.CommandRouterFactoryBuilder
+import io.github.uharaqo.epoque.builder.DataCodecFactory
+import io.github.uharaqo.epoque.builder.DefaultRegistry
+import io.github.uharaqo.epoque.builder.RegistryBuilder
+import io.github.uharaqo.epoque.builder.toCommandCodec
 
 fun CommandRouter.Companion.fromFactories(
   environment: EpoqueEnvironment,
@@ -41,18 +45,72 @@ fun CommandRouter.Companion.fromFactories(
   )
 }
 
-fun interface TypedCommandProcessorFactory<C : Any, S, E : Any> {
-  fun create(environment: EpoqueEnvironment): TypedCommandProcessor<C>
+private class DefaultCommandHandler<C, S, E>(
+  private val impl: suspend CommandHandlerBuilder<C, S, E>.(C, S) -> Unit,
+  private val runtimeEnvFactory: CommandHandlerBuilderFactory<C, S, E>,
+) : CommandHandler<C, S, E> {
+  override suspend fun handle(c: C, s: S): CommandHandlerOutput<E> =
+    runtimeEnvFactory.create().apply { impl(c, s) }.complete()
 }
 
-class DefaultCommandRouterFactory<C : Any, S, E : Any>(
+class DefaultCommandRouterFactoryBuilder<C : Any, S, E : Any>(
+  private val journal: Journal<S, E>,
+  override val codecFactory: DataCodecFactory,
+) : CommandRouterFactoryBuilder<C, S, E>() {
+  private val commandRouterFactory = DefaultCommandRouterFactory<C, S, E>()
+
+  override fun <CC : C> commandHandlerFor(
+    codec: DataCodec<CC>,
+    handle: suspend CommandHandlerBuilder<CC, S, E>.(c: CC, s: S) -> Unit,
+  ) {
+    val handlerFactory = CommandHandlerFactory { env: EpoqueEnvironment ->
+      // TODO: no need to depend on env?
+      val journalChecker: JournalChecker = env.eventReader
+
+      val runtimeEnvFactory =
+        CommandHandlerBuilderFactory {
+          // retrieved at runtime
+          @Suppress("UNCHECKED_CAST")
+          val runtimeEnv =
+            CommandHandlerRuntimeEnvironment.get()!! as CommandHandlerRuntimeEnvironment<E>
+          DefaultCommandHandlerRuntime<CC, S, E>(runtimeEnv)
+        }
+
+      DefaultCommandHandler(handle, runtimeEnvFactory)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    register(
+      codec = codec as DataCodec<C>,
+      commandHandlerFactory = handlerFactory as CommandHandlerFactory<C, S, E>,
+    )
+  }
+
+  override fun register(
+    codec: DataCodec<C>,
+    commandHandlerFactory: CommandHandlerFactory<C, S, E>,
+  ) {
+    commandRouterFactory.register(codec) { env ->
+      env.create(journal, codec.toCommandCodec(), commandHandlerFactory)
+    }
+  }
+
+  override fun build(): CommandRouterFactory = commandRouterFactory
+}
+
+private class DefaultCommandRouter(
+  override val commandCodecRegistry: CommandCodecRegistry,
+  override val commandProcessorRegistry: CommandProcessorRegistry,
+) : CommandRouter
+
+private class DefaultCommandRouterFactory<C : Any, S, E : Any>(
   private val commandCodecRegistryBuilder: RegistryBuilder<CommandType, CommandCodec<*>> = RegistryBuilder(),
-  private val commandProcessorRegistryBuilder: RegistryBuilder<CommandType, TypedCommandProcessorFactory<C, S, E>> = RegistryBuilder(),
+  private val commandProcessorRegistryBuilder: RegistryBuilder<CommandType, CommandProcessorFactory> = RegistryBuilder(),
 ) : CommandRouterFactory {
 
   fun register(
     codec: DataCodec<C>,
-    handlerFactory: TypedCommandProcessorFactory<C, S, E>,
+    handlerFactory: CommandProcessorFactory,
   ): DefaultCommandRouterFactory<C, S, E> {
     val type = CommandType.of(codec.type)
     return this.also {
@@ -77,51 +135,4 @@ class DefaultCommandRouterFactory<C : Any, S, E : Any>(
       ),
     )
   }
-}
-
-class DefaultCommandRouter(
-  override val commandCodecRegistry: CommandCodecRegistry,
-  override val commandProcessorRegistry: CommandProcessorRegistry,
-) : CommandRouter
-
-class CommandRouterFactoryBuilder<C : Any, S, E : Any>(
-  private val journal: Journal<S, E>,
-  val codecFactory: DataCodecFactory,
-) {
-  private val commandRouterFactory = DefaultCommandRouterFactory<C, S, E>()
-
-  /** [CC]: Concrete type of the command */
-  inline fun <reified CC : C> commandHandlerFor(
-    noinline handle: suspend CommandHandlerBuilder<CC, S, E>.(c: CC, s: S) -> Unit,
-  ): CommandRouterFactoryBuilder<C, S, E> {
-    val factory = CommandHandlerFactory { env: EpoqueEnvironment ->
-      val journalChecker = env.eventReader // captured at build time
-      val runtimeEnvFactory = CommandHandlerRuntimeEnvironmentFactory<CC, S, E> {
-        val commandCodecRegistry = CommandCodecRegistry.get() // retrieved at runtime
-        CommandHandlerRuntimeEnvironment(journalChecker, commandCodecRegistry)
-      }
-      DefaultCommandHandler(handle, runtimeEnvFactory)
-    }
-    val codec = codecFactory.codecFor<CC>()
-
-    @Suppress("UNCHECKED_CAST")
-    return register(
-      codec = codec as DataCodec<C>,
-      commandHandlerFactory = factory as CommandHandlerFactory<C, S, E>,
-    )
-  }
-
-  fun register(
-    codec: DataCodec<C>,
-    commandHandlerFactory: CommandHandlerFactory<C, S, E>,
-  ): CommandRouterFactoryBuilder<C, S, E> = this.also {
-    commandRouterFactory.register(codec) { env ->
-      TypedCommandProcessor(
-        commandDecoder = codec.toCommandCodec(),
-        executor = CommandExecutor.create(journal, commandHandlerFactory, env),
-      )
-    }
-  }
-
-  fun build(): CommandRouterFactory = commandRouterFactory
 }

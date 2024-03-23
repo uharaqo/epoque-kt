@@ -1,7 +1,7 @@
 package io.github.uharaqo.epoque.db.jooq
 
 import io.github.uharaqo.epoque.api.Journal
-import io.github.uharaqo.epoque.impl.ProjectionRegistry
+import io.github.uharaqo.epoque.builder.ProjectionRegistry
 
 object EpoqueJooq {
   fun <S, E : Any> projectionFor(

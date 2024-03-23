@@ -5,12 +5,11 @@ import io.github.uharaqo.epoque.api.CommandExecutorOptions
 import io.github.uharaqo.epoque.api.CommandRouter
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.EventStore
-import io.github.uharaqo.epoque.api.LockOption.LOCK_JOURNAL
+import io.github.uharaqo.epoque.api.WriteOption.LOCK_JOURNAL
+import io.github.uharaqo.epoque.builder.CommandRouterFactory
 import io.github.uharaqo.epoque.db.jooq.JooqEventStore
 import io.github.uharaqo.epoque.db.jooq.TableDefinition
 import io.github.uharaqo.epoque.db.jooq.h2.H2JooqQueries
-import io.github.uharaqo.epoque.impl.CommandRouterFactory
-import io.github.uharaqo.epoque.impl.DefaultCommandRouter
 import io.github.uharaqo.epoque.impl.fromFactories
 import io.github.uharaqo.epoque.test.api.Tester
 import io.github.uharaqo.epoque.test.impl.DebugLogger
@@ -52,7 +51,7 @@ object EpoqueTest {
     eventStore: EventStore = newH2EventStore(),
     options: CommandExecutorOptions = CommandExecutorOptions(
       timeoutMillis = 30000,
-      lockOption = LOCK_JOURNAL,
+      writeOption = LOCK_JOURNAL,
     ),
     callbackHandler: CallbackHandler = DebugLogger(),
   ): EpoqueEnvironment =
@@ -64,6 +63,6 @@ object EpoqueTest {
   ): Tester {
     val router = CommandRouter.fromFactories(environment, commandRouterFactories.toList())
 
-    return DefaultTester(router as DefaultCommandRouter, environment)
+    return DefaultTester(router, environment)
   }
 }

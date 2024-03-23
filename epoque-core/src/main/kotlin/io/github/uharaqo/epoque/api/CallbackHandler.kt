@@ -43,4 +43,8 @@ interface CallbackHandler {
         other.afterRollback(context, error)
       }
     }
+
+  companion object {
+    val EMPTY = object : CallbackHandler {}
+  }
 }
