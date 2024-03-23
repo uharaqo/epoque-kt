@@ -6,9 +6,9 @@ import io.github.uharaqo.epoque.api.CommandRouter
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.EventStore
 import io.github.uharaqo.epoque.api.LockOption.LOCK_JOURNAL
-import io.github.uharaqo.epoque.db.jooq.H2JooqQueries
 import io.github.uharaqo.epoque.db.jooq.JooqEventStore
 import io.github.uharaqo.epoque.db.jooq.TableDefinition
+import io.github.uharaqo.epoque.db.jooq.h2.H2JooqQueries
 import io.github.uharaqo.epoque.impl.CommandRouterFactory
 import io.github.uharaqo.epoque.impl.DefaultCommandRouter
 import io.github.uharaqo.epoque.impl.fromFactories

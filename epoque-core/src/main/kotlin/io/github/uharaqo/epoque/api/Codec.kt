@@ -60,7 +60,7 @@ value class EventCodecRegistry(
     @Suppress("UNCHECKED_CAST")
     codecs.find(type).map { it as EventCodec<E> }
 
-  object Key : EpoqueContextKey<EventCodecRegistry>
+  companion object : EpoqueContextKey<EventCodecRegistry>
 }
 
 @JvmInline
@@ -102,5 +102,5 @@ value class CommandCodecRegistry(
 
   fun toMap(): Map<CommandType, CommandCodec<*>> = codecs.toMap()
 
-  object Key : EpoqueContextKey<CommandCodecRegistry>
+  companion object : EpoqueContextKey<CommandCodecRegistry>
 }

@@ -2,7 +2,6 @@ package io.github.uharaqo.epoque.impl
 
 import io.github.uharaqo.epoque.api.CommandCodec
 import io.github.uharaqo.epoque.api.CommandCodecRegistry
-import io.github.uharaqo.epoque.api.CommandHandler
 import io.github.uharaqo.epoque.api.CommandProcessor
 import io.github.uharaqo.epoque.api.CommandProcessorRegistry
 import io.github.uharaqo.epoque.api.CommandRouter
@@ -95,27 +94,31 @@ class CommandRouterFactoryBuilder<C : Any, S, E : Any>(
   inline fun <reified CC : C> commandHandlerFor(
     noinline handle: suspend CommandHandlerBuilder<CC, S, E>.(c: CC, s: S) -> Unit,
   ): CommandRouterFactoryBuilder<C, S, E> {
-    val handlerFactory = { env: EpoqueEnvironment ->
-      val journalChecker = env.eventReader // cached
-      DefaultCommandHandler(handle) { CommandHandlerRuntimeEnvironment(journalChecker) }
+    val factory = CommandHandlerFactory { env: EpoqueEnvironment ->
+      val journalChecker = env.eventReader // captured at build time
+      val runtimeEnvFactory = CommandHandlerRuntimeEnvironmentFactory<CC, S, E> {
+        val commandCodecRegistry = CommandCodecRegistry.get() // retrieved at runtime
+        CommandHandlerRuntimeEnvironment(journalChecker, commandCodecRegistry)
+      }
+      DefaultCommandHandler(handle, runtimeEnvFactory)
     }
     val codec = codecFactory.codecFor<CC>()
 
     @Suppress("UNCHECKED_CAST")
     return register(
       codec = codec as DataCodec<C>,
-      handlerFactory = handlerFactory as ((EpoqueEnvironment) -> CommandHandler<C, S, E>),
+      commandHandlerFactory = factory as CommandHandlerFactory<C, S, E>,
     )
   }
 
   fun register(
     codec: DataCodec<C>,
-    handlerFactory: (EpoqueEnvironment) -> CommandHandler<C, S, E>,
+    commandHandlerFactory: CommandHandlerFactory<C, S, E>,
   ): CommandRouterFactoryBuilder<C, S, E> = this.also {
     commandRouterFactory.register(codec) { env ->
       TypedCommandProcessor(
         commandDecoder = codec.toCommandCodec(),
-        executor = CommandExecutor.create(env, journal, handlerFactory),
+        executor = CommandExecutor.create(journal, commandHandlerFactory, env),
       )
     }
   }

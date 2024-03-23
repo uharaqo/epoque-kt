@@ -46,7 +46,7 @@ class DefaultCommandTester<S, E : Any>(
     either {
       val type = CommandType.of(command::class.java)
       val commandCodec = commandRouter.commandCodecRegistry.find<Any>(type).bind()
-      val payload = commandCodec.encoder.encode(command).bind()
+      val payload = commandCodec.encode(command).bind()
       val input = CommandInput(id, type, payload, metadata)
 
       val result = runBlocking { commandRouter.process(input) }.bind()

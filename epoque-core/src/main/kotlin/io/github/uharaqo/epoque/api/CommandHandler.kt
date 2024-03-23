@@ -20,7 +20,9 @@ interface CommandRouter : CommandProcessor {
   val commandProcessorRegistry: CommandProcessorRegistry
 
   override suspend fun process(input: CommandInput): Failable<CommandOutput> =
-    commandProcessorRegistry.find(input.type).flatMap { it.process(input) }
+    EpoqueContext.with({ add(CommandCodecRegistry, commandCodecRegistry) }) {
+      commandProcessorRegistry.find(input.type).flatMap { it.process(input) }
+    }
 
   companion object
 }

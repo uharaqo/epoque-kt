@@ -6,7 +6,7 @@ interface TransactionContext {
   val lockOption: LockOption
   val lockedKeys: Set<JournalKey>
 
-  object Key : EpoqueContextKey<TransactionContext>
+  companion object : EpoqueContextKey<TransactionContext>
 }
 
 /** Controls how command handlers are executed for each [JournalKey] */

@@ -30,7 +30,7 @@ class TransactionalProjectionExecutor(
   private val projectionRegistry: ProjectionRegistry,
 ) : CallbackHandler {
   override suspend fun beforeCommit(output: CommandOutput) {
-    val tx = TransactionContext.Key.get()
+    val tx = TransactionContext.get()
       ?: throw UNKNOWN_EXCEPTION.toException(message = "Transaction not found")
 
     output.events.forEach { ve ->

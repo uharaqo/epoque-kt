@@ -2,6 +2,8 @@ package io.github.uharaqo.epoque.db.jooq
 
 import arrow.core.Either
 import arrow.core.getOrElse
+import io.github.uharaqo.epoque.api.CommandContext
+import io.github.uharaqo.epoque.api.CommandExecutorOptions
 import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.EpoqueContext
 import io.github.uharaqo.epoque.api.EpoqueException
@@ -17,7 +19,9 @@ import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withTimeout
 import org.jooq.DSLContext
 import org.jooq.exception.IntegrityConstraintViolationException
 import org.jooq.kotlin.coroutines.transactionCoroutine
@@ -54,7 +58,7 @@ class JooqEventStore<D>(
     }
   }.mapLeft { it.toEpoqueException() }
 
-  private suspend fun getTransactionContext() = TransactionContext.Key.get()
+  private suspend fun getTransactionContext() = TransactionContext.get()
 
   private suspend fun <T> runTransaction(
     ctx: DSLContext,
@@ -63,18 +67,30 @@ class JooqEventStore<D>(
     block: suspend (tx: TransactionContext) -> T,
     beforeExecute: suspend (DSLContext) -> Unit = {},
   ): T {
-    // explicitly propagate this context because current context has Job related contexts
-    val epoqueContext = coroutineContext[EpoqueContext.Key] ?: EpoqueContext.create()
+    // jOOQ does not work with a coroutineContext that contains a Job
+    val coroutineCtx = coroutineContext.minusKey(Job)
 
-    return ctx.transactionCoroutine(Dispatchers.IO) { conf ->
-      val tx = JooqTransactionContext(conf.dsl(), lockOption, lockedKeys)
-      epoqueContext.withContext(TransactionContext.Key, tx) {
-        // explicitly throw exception to roll back the transaction
-        tx.asJooq { beforeExecute(this.ctx) }
-        block(tx)
+    return ctx.transactionCoroutine(coroutineCtx + Dispatchers.IO) { conf ->
+      // setting the timeout again because the TimeoutCoroutine was removed as a Job
+      withTimeout(getRemainingMillisToTimeout()) {
+        val tx = JooqTransactionContext(conf.dsl(), lockOption, lockedKeys)
+        EpoqueContext.with({ add(TransactionContext, tx) }) {
+          // explicitly throw exception to roll back the transaction
+          tx.asJooq { beforeExecute(this.ctx) }
+          block(tx)
+        }
       }
     }
   }
+
+  private suspend fun getRemainingMillisToTimeout(): Long =
+    CommandContext.get()
+      ?.let { context ->
+        val timeoutMillis = context.options.timeoutMillis
+        val elapsedMillis = System.currentTimeMillis() - context.receivedTime.toEpochMilli()
+        timeoutMillis - elapsedMillis
+      }
+      ?: CommandExecutorOptions().timeoutMillis
 
   override suspend fun <T> startDefaultTransaction(block: suspend (tx: TransactionContext) -> T): Failable<T> =
     Either.catch {
