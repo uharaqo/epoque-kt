@@ -41,18 +41,18 @@ fun CommandRouter.Companion.fromFactories(
   )
 }
 
-fun interface TypedCommandProcessorFactory<C : Any, S, E : Any> {
-  fun create(environment: EpoqueEnvironment): TypedCommandProcessor<C>
+fun interface CommandProcessorFactory {
+  fun create(environment: EpoqueEnvironment): CommandProcessor
 }
 
 class DefaultCommandRouterFactory<C : Any, S, E : Any>(
   private val commandCodecRegistryBuilder: RegistryBuilder<CommandType, CommandCodec<*>> = RegistryBuilder(),
-  private val commandProcessorRegistryBuilder: RegistryBuilder<CommandType, TypedCommandProcessorFactory<C, S, E>> = RegistryBuilder(),
+  private val commandProcessorRegistryBuilder: RegistryBuilder<CommandType, CommandProcessorFactory> = RegistryBuilder(),
 ) : CommandRouterFactory {
 
   fun register(
     codec: DataCodec<C>,
-    handlerFactory: TypedCommandProcessorFactory<C, S, E>,
+    handlerFactory: CommandProcessorFactory,
   ): DefaultCommandRouterFactory<C, S, E> {
     val type = CommandType.of(codec.type)
     return this.also {
@@ -94,11 +94,12 @@ class CommandRouterFactoryBuilder<C : Any, S, E : Any>(
   inline fun <reified CC : C> commandHandlerFor(
     noinline handle: suspend CommandHandlerBuilder<CC, S, E>.(c: CC, s: S) -> Unit,
   ): CommandRouterFactoryBuilder<C, S, E> {
-    val factory = CommandHandlerFactory { env: EpoqueEnvironment ->
-      val journalChecker = env.eventReader // captured at build time
+    val codec = codecFactory.codecFor<CC>()
+    val handlerFactory = CommandHandlerFactory { env: EpoqueEnvironment ->
+      // TODO: no need to depend on env?
       val runtimeEnvFactory = CommandHandlerRuntimeEnvironmentFactory<CC, S, E> {
-        val commandCodecRegistry = CommandCodecRegistry.get() // retrieved at runtime
-        CommandHandlerRuntimeEnvironment(journalChecker, commandCodecRegistry)
+        val runtimeEnv = CommandHandlerRuntimeEnvironment.get()!! // retrieved at runtime
+        DefaultCommandHandlerRuntime(runtimeEnv)
       }
       DefaultCommandHandler(handle, runtimeEnvFactory)
     }
@@ -116,10 +117,7 @@ class CommandRouterFactoryBuilder<C : Any, S, E : Any>(
     commandHandlerFactory: CommandHandlerFactory<C, S, E>,
   ): CommandRouterFactoryBuilder<C, S, E> = this.also {
     commandRouterFactory.register(codec) { env ->
-      TypedCommandProcessor(
-        commandDecoder = codec.toCommandCodec(),
-        executor = CommandExecutor.create(journal, commandHandlerFactory, env),
-      )
+      CommandExecutor.create(journal, codec.toCommandCodec(), commandHandlerFactory, env)
     }
   }
 

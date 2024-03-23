@@ -31,6 +31,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
+import java.time.Instant
 
 class LockJournalSpec : StringSpec(
   {
@@ -151,6 +152,7 @@ class LockJournalSpec : StringSpec(
       SerializedCommand(SerializedJson("{}")),
       InputMetadata.EMPTY,
       CommandExecutorOptions(),
+      Instant.now(),
     )
     val event1 = VersionedEvent(
       Version(1),

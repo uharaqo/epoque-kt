@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
+import java.time.Instant
 
 abstract class TestEnvironment {
   val jsonCodecFactory = JsonCodecFactory()
@@ -140,6 +141,7 @@ abstract class TestEnvironment {
   }
 
   val dummyCommandType = CommandType.of<TestCommand.Create>()
+  val dummyCommandDecoder = JsonCodec.of<TestCommand.Create>().toCommandCodec()
   val dummyCommandHandler =
     CommandHandler<TestCommand, MockSummary, TestEvent> { c, s ->
       @Suppress("UNCHECKED_CAST")
@@ -167,12 +169,14 @@ abstract class TestEnvironment {
     dummyEventCodecRegistry,
   )
 
+  val dummyReceivedTime = Instant.now()
   val dummyCommandContext = CommandContext(
     dummyJournalKey,
     dummyCommandType,
     serializedCommand,
     InputMetadata.EMPTY,
     CommandExecutorOptions(),
+    dummyReceivedTime,
   )
 
   val dummyCallbackHandler = object : CallbackHandler {
@@ -250,9 +254,8 @@ abstract class TestEnvironment {
   ): CommandExecutor<TestCommand, MockSummary, TestEvent> {
     val mock = mockk<CommandExecutor<TestCommand, MockSummary, TestEvent>>()
     every { mock.journalGroupId.unwrap } returns CommandRouterSpec.dummyJournalKey.groupId.unwrap
-    every { mock.defaultCommandExecutorOptions } returns CommandExecutorOptions()
     every { mock.eventCodecRegistry } returns CommandRouterSpec.dummyEventCodecRegistry
-    coEvery { mock.execute(any(), any()) } returns commandOutput.right()
+    coEvery { mock.execute(any(), any(), any(), any()) } returns commandOutput.right()
     return mock
   }
 
@@ -270,6 +273,7 @@ abstract class TestEnvironment {
   ): CommandExecutor<TestCommand, MockSummary, TestEvent> {
     return CommandExecutor(
       dummyJournalKey.groupId,
+      dummyCommandDecoder,
       dummyCommandHandler,
       dummyEventCodecRegistry,
       dummyEventHandlerExecutor,
@@ -277,7 +281,7 @@ abstract class TestEnvironment {
       eventWriter ?: dummyEnvironment.eventWriter,
       dummyEnvironment.transactionStarter,
       dummyEnvironment.defaultCommandExecutorOptions,
-      dummyEnvironment.callbackHandler,
+      dummyEnvironment.callbackHandler ?: CallbackHandler.EMPTY,
     )
   }
 }

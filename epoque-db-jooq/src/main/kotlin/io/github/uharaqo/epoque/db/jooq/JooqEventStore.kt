@@ -74,7 +74,7 @@ class JooqEventStore<D>(
       // setting the timeout again because the TimeoutCoroutine was removed as a Job
       withTimeout(getRemainingMillisToTimeout()) {
         val tx = JooqTransactionContext(conf.dsl(), lockOption, lockedKeys)
-        EpoqueContext.with({ add(TransactionContext, tx) }) {
+        EpoqueContext.with({ put(TransactionContext, tx) }) {
           // explicitly throw exception to roll back the transaction
           tx.asJooq { beforeExecute(this.ctx) }
           block(tx)

@@ -1,13 +1,13 @@
 package io.github.uharaqo.epoque.impl
 
+import arrow.core.getOrElse
 import io.github.uharaqo.epoque.Epoque
 import io.github.uharaqo.epoque.api.CommandInput
-import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestCommand
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestEvent
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestSummary
-import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.shouldBe
 
 class CommandRouterSpec : StringSpec(
   {
@@ -28,14 +28,12 @@ class CommandRouterSpec : StringSpec(
         type = dummyCommandType,
         payload = serializedCommand,
       )
-      val output = commandRouter.process(input)
+      val output = commandRouter.process(input).getOrElse { throw it }
 
       // then
-      output shouldBeRight CommandOutput(
-        dummyOutputEvents,
-        dummyOutputMetadata,
-        dummyCommandContext,
-      )
+      output.events shouldBe dummyOutputEvents
+      output.metadata shouldBe dummyOutputMetadata
+      output.context.copy(receivedTime = dummyReceivedTime) shouldBe dummyCommandContext
     }
   },
 ) {
