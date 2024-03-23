@@ -1,5 +1,7 @@
 package io.github.uharaqo.epoque.api
 
+import java.time.Instant
+
 @JvmInline
 value class JournalGroupId(val unwrap: String) {
   override fun toString() = unwrap
@@ -51,9 +53,17 @@ data class CommandContext(
   val command: SerializedCommand,
   val metadata: InputMetadata,
   val options: CommandExecutorOptions,
+  val receivedTime: Instant,
 ) {
-  object Key : EpoqueContextKey<CommandContext>
+
+  companion object : EpoqueContextKey<CommandContext>
 }
+
+fun CommandContext.getElapsedTimeMillis(): Long =
+  Instant.now().toEpochMilli() - receivedTime.toEpochMilli()
+
+fun CommandContext.getRemainingTimeMillis(): Long =
+  options.timeoutMillis - getElapsedTimeMillis()
 
 data class CommandHandlerOutput<E>(
   val events: List<E>,

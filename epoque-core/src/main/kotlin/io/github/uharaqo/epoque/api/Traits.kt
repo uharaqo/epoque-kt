@@ -9,10 +9,8 @@ import io.github.uharaqo.epoque.api.EpoqueException.Cause.SUMMARY_AGGREGATION_FA
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.TIMEOUT_EXCEPTION
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.UNKNOWN_EXCEPTION
 import java.time.Instant
-import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.withContext
 
 /** Serialize events by using [EventHandlerRegistry]. */
 interface CanSerializeEvents<E : Any> {
@@ -192,27 +190,31 @@ interface CanProcessCommand<C> : CommandProcessor {
     either {
       val command = commandDecoder.decode(input.payload).bind()
 
-      val commandContext = CommandContext(
-        key = JournalKey(executor.journalGroupId, input.id),
-        commandType = input.type,
-        command = input.payload,
-        metadata = input.metadata.asInputMetadata(),
-        options =
-        input.commandExecutorOptions
-          ?: executor.defaultCommandExecutorOptions
-          ?: CommandExecutorOptions(),
-      )
+      val commandContext =
+        CommandContext(
+          key = JournalKey(executor.journalGroupId, input.id),
+          commandType = input.type,
+          command = input.payload,
+          metadata = input.metadata.asInputMetadata(),
+          options = input.getCommandExecutorOptions().refreshTimeoutMillis(),
+          receivedTime = Instant.now(),
+        )
 
-      val epoqueContext =
-        EpoqueContext.create()
-          .with(CommandContext.Key, commandContext)
-          .with(EventCodecRegistry.Key, executor.eventCodecRegistry)
-          .with(ReceivedTime, Instant.now())
-
-      withContext(coroutineContext + epoqueContext) {
-        executor.execute(command, commandContext).bind()
-      }
+      EpoqueContext.with(
+        {
+          add(CommandContext, commandContext)
+          add(EventCodecRegistry, executor.eventCodecRegistry)
+        },
+      ) { executor.execute(command, commandContext).bind() }
     }
-}
 
-object ReceivedTime : EpoqueContextKey<Instant>
+  private fun CommandInput.getCommandExecutorOptions(): CommandExecutorOptions =
+    commandExecutorOptions
+      ?: executor.defaultCommandExecutorOptions
+      ?: CommandExecutorOptions()
+
+  private suspend fun CommandExecutorOptions.refreshTimeoutMillis(): CommandExecutorOptions =
+    CommandContext.get()?.getRemainingTimeMillis()
+      ?.let { this.copy(timeoutMillis = it) }
+      ?: this
+}

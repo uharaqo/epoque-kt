@@ -1,4 +1,4 @@
-package io.github.uharaqo.epoque.db.jooq
+package io.github.uharaqo.epoque.db.jooq.h2
 
 import arrow.core.Either
 import arrow.core.left
@@ -10,6 +10,8 @@ import io.github.uharaqo.epoque.api.SerializedData
 import io.github.uharaqo.epoque.api.SerializedEvent
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
+import io.github.uharaqo.epoque.db.jooq.JooqQueries
+import io.github.uharaqo.epoque.db.jooq.TableDefinition
 import io.github.uharaqo.epoque.serialization.SerializedJson
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
@@ -22,7 +24,7 @@ import org.jooq.impl.DSL.row
 import org.jooq.kotlin.coroutines.transactionCoroutine
 
 class H2JooqQueries(
-  private val def: TableDefinition,
+  private val tableDefinition: TableDefinition,
 ) : JooqQueries<JSONB> {
   override fun JSONB.toSerializedData(): SerializedData = SerializedJson(this.data())
 
@@ -33,7 +35,7 @@ class H2JooqQueries(
     key: JournalKey,
     prevVersion: Version,
   ): Flow<VersionedEvent> =
-    with(def) {
+    with(tableDefinition) {
       ctx.select(VERSION, TYPE, CONTENT)
         .from(EVENT)
         .where(
@@ -53,7 +55,7 @@ class H2JooqQueries(
     }
 
   override suspend fun journalExists(ctx: DSLContext, key: JournalKey): Boolean =
-    with(def) {
+    with(tableDefinition) {
       ctx.select(inline(1))
         .from(EVENT)
         .where(GROUP.eq(key.groupId.unwrap), ID.eq(key.id.unwrap))
@@ -63,7 +65,7 @@ class H2JooqQueries(
     }
 
   override suspend fun writeEvents(ctx: DSLContext, key: JournalKey, events: List<VersionedEvent>) =
-    with(def) {
+    with(tableDefinition) {
       ctx.transactionCoroutine {
         val tx = it.dsl()
         val records =
@@ -114,12 +116,12 @@ class H2JooqQueries(
     key: JournalKey,
     version: Long,
   ): Boolean =
-    with(def) {
+    with(tableDefinition) {
       try {
         insertInto(EVENT)
           .columns(GROUP, ID, VERSION, TYPE, CONTENT)
           .values(key.groupId.unwrap, key.id.unwrap, version, "(LOCK)", JSONB.jsonb(null))
-//        .onConflictDoNothing() // not supported in H2
+          //        .onConflictDoNothing() // not supported in H2
           .awaitFirstOrNull() == 1
       } catch (ignored: Exception) {
         false
@@ -131,14 +133,14 @@ class H2JooqQueries(
     key: JournalKey,
     version: Long,
   ): Boolean =
-    with(def) {
+    with(tableDefinition) {
       deleteFrom(EVENT)
         .where(GROUP.eq(key.groupId.unwrap), ID.eq(key.id.unwrap), VERSION.eq(version))
         .awaitFirstOrNull() == 1
     }
 
   private suspend fun DSLContext.lockEarliestEvent(key: JournalKey): Boolean =
-    with(def) {
+    with(tableDefinition) {
       select(inline(1))
         .from(EVENT)
         .where(GROUP.eq(key.groupId.unwrap), ID.eq(key.id.unwrap))

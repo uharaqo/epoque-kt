@@ -15,6 +15,10 @@ import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.api.TransactionStarter
 
+fun interface CommandHandlerFactory<C, S, E : Any> {
+  fun create(environment: EpoqueEnvironment): CommandHandler<C, S, E>
+}
+
 class CommandExecutor<C, S, E : Any>(
   override val journalGroupId: JournalGroupId,
   override val commandHandler: CommandHandler<C, S, E>,
@@ -29,23 +33,21 @@ class CommandExecutor<C, S, E : Any>(
 
   companion object {
     fun <C : Any, S, E : Any> create(
-      env: EpoqueEnvironment,
       journal: Journal<S, E>,
-      handlerFactory: (EpoqueEnvironment) -> CommandHandler<C, S, E>,
+      commandHandlerFactory: CommandHandlerFactory<C, S, E>,
+      environment: EpoqueEnvironment,
     ): CommandExecutor<C, S, E> =
-      with(env) {
-        CommandExecutor(
-          journalGroupId = journal.journalGroupId,
-          commandHandler = handlerFactory(this),
-          eventCodecRegistry = journal.eventCodecRegistry,
-          eventHandlerExecutor = journal.toEventHandlerExecutor(),
-          eventReader = eventReader,
-          eventWriter = eventWriter,
-          transactionStarter = transactionStarter,
-          defaultCommandExecutorOptions = defaultCommandExecutorOptions,
-          callbackHandler = callbackHandler,
-        )
-      }
+      CommandExecutor(
+        journalGroupId = journal.journalGroupId,
+        commandHandler = commandHandlerFactory.create(environment),
+        eventCodecRegistry = journal.eventCodecRegistry,
+        eventHandlerExecutor = journal.toEventHandlerExecutor(),
+        eventReader = environment.eventReader,
+        eventWriter = environment.eventWriter,
+        transactionStarter = environment.transactionStarter,
+        defaultCommandExecutorOptions = environment.defaultCommandExecutorOptions,
+        callbackHandler = environment.callbackHandler,
+      )
   }
 }
 

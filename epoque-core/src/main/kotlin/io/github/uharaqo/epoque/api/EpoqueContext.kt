@@ -11,37 +11,55 @@ class EpoqueContext private constructor(
   private val map: Map<EpoqueContextKey<*>, Any>,
 ) : CoroutineContext.Element {
 
-  override val key = Key
+  override val key = Companion
 
   operator fun <V> get(key: EpoqueContextKey<V>): V? =
     @Suppress("UNCHECKED_CAST")
     map[key]?.let { it as V }
 
   fun <V> with(key: EpoqueContextKey<V>, value: V): EpoqueContext =
-    EpoqueContext(map + (key to value as Any))
+    DefaultBuilder(this).also { it.add(key, value) }.build()
 
   @OptIn(ExperimentalContracts::class)
-  suspend fun <T, V> withContext(
-    key: EpoqueContextKey<V>,
-    value: V,
-    block: suspend CoroutineScope.() -> T,
-  ): T {
+  suspend fun <T> withContext(block: suspend CoroutineScope.() -> T): T {
     contract {
       callsInPlace(block, InvocationKind.EXACTLY_ONCE)
     }
-    val context = coroutineContext + with(key, value)
+    val context = coroutineContext + this
     return kotlinx.coroutines.withContext(context, block)
   }
 
-  object Key : CoroutineContext.Key<EpoqueContext>
+  override fun toString(): String = map.toString()
 
-  companion object {
+  companion object : CoroutineContext.Key<EpoqueContext> {
+    suspend fun get(): EpoqueContext? = coroutineContext[Companion]
+
     fun create(): EpoqueContext = EpoqueContext(emptyMap())
 
-    suspend fun get(): EpoqueContext = coroutineContext[Key]!!
+    suspend fun getOrCreate(): EpoqueContext = get() ?: create()
+
+    suspend fun with(block: Builder.() -> Unit): EpoqueContext =
+      DefaultBuilder(getOrCreate()).apply(block).build()
+
+    suspend fun <T> with(configure: Builder.() -> Unit, block: suspend CoroutineScope.() -> T): T =
+      Companion.with(configure).withContext(block)
+  }
+
+  interface Builder {
+    fun <V> add(key: EpoqueContextKey<V>, value: V)
+  }
+
+  private class DefaultBuilder(original: EpoqueContext?) : Builder {
+    private val map = original?.map?.toMutableMap() ?: mutableMapOf()
+
+    override fun <V> add(key: EpoqueContextKey<V>, value: V) {
+      map += (key to value as Any)
+    }
+
+    fun build(): EpoqueContext = EpoqueContext(map)
   }
 }
 
 interface EpoqueContextKey<out V> {
-  suspend fun get(): V? = coroutineContext[EpoqueContext.Key]?.let { it[this] }
+  suspend fun get(): V? = coroutineContext[EpoqueContext]?.let { it[this] }
 }

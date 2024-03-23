@@ -1,6 +1,7 @@
 package io.github.uharaqo.epoque.integration.epoque.project
 
 import io.github.uharaqo.epoque.Epoque
+import io.github.uharaqo.epoque.integration.epoque.task.CreateTask
 import io.github.uharaqo.epoque.serialization.JsonCodecFactory
 
 sealed interface Project {
@@ -21,6 +22,7 @@ val PROJECT_JOURNAL = builder.summaryFor<Project>(Project.Empty) {
 val PROJECT_COMMANDS = builder.routerFor<ProjectCommand, Project, ProjectEvent>(PROJECT_JOURNAL) {
   commandHandlerFor<CreateProject> { c, s ->
     if (s is Project.Empty) {
+      chain("Foo", CreateTask("TaskX"))
       emit(c.toProjectCreated())
     } else {
       reject("Project already exists")

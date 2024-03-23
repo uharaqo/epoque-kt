@@ -1,5 +1,6 @@
 package io.github.uharaqo.epoque.db.jooq
 
+import io.github.uharaqo.epoque.db.jooq.h2.H2JooqQueries
 import java.sql.DriverManager
 import org.jooq.DSLContext
 import org.jooq.JSONB
