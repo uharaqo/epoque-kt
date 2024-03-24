@@ -8,7 +8,7 @@ import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CoroutineScope
 
 class EpoqueContext private constructor(
-  private val map: Map<EpoqueContextKey<*>, Any>,
+  private val map: Map<EpoqueContextKey<*>, Any?>,
 ) : CoroutineContext.Element {
 
   override val key = Companion
@@ -44,18 +44,19 @@ class EpoqueContext private constructor(
 
   interface Builder {
     fun <V> put(key: EpoqueContextKey<V>, value: V)
-    fun <V> putIfAbsent(key: EpoqueContextKey<V>, value: () -> V)
+    suspend fun <V> map(key: EpoqueContextKey<V>, f: suspend (V?) -> V)
   }
 
   private class DefaultBuilder(private val original: EpoqueContext?) : Builder {
-    private val map = mutableMapOf<EpoqueContextKey<*>, Any>()
+    private val map = mutableMapOf<EpoqueContextKey<*>, Any?>()
 
     override fun <V> put(key: EpoqueContextKey<V>, value: V) {
-      map += (key to value as Any)
+      map += (key to value as Any?)
     }
 
-    override fun <V> putIfAbsent(key: EpoqueContextKey<V>, value: () -> V) {
-      map.computeIfAbsent(key) { _ -> value() as Any }
+    override suspend fun <V> map(key: EpoqueContextKey<V>, f: suspend (V?) -> V) {
+      @Suppress("UNCHECKED_CAST")
+      map[key] = f(map[key] as V?)
     }
 
     fun build(): EpoqueContext =

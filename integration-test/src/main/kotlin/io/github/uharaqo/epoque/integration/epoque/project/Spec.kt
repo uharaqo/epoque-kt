@@ -20,9 +20,18 @@ val PROJECT_JOURNAL = builder.summaryFor<Project>(Project.Empty) {
 }
 
 val PROJECT_COMMANDS = builder.with(PROJECT_JOURNAL).routerFor<ProjectCommand> {
-  commandHandlerFor<CreateProject> { c, s ->
+  commandHandlerFor<CreateProject, String>(
+    { c -> "PREPARED" },
+  ) { c, s, x ->
+    println("=-=")
+    println("[[[$x]]]")
+    println("=-=")
     if (s is Project.Empty) {
       chain("Foo", CreateTask("TaskX"))
+      notify {
+        println("NOTIFICATION SENT")
+      }
+
       emit(c.toProjectCreated())
     } else {
       reject("Project already exists")

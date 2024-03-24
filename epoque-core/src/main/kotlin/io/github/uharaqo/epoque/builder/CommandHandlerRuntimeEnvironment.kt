@@ -1,25 +1,41 @@
-package io.github.uharaqo.epoque.impl
+package io.github.uharaqo.epoque.builder
 
-import arrow.core.raise.Raise
+import io.github.uharaqo.epoque.api.CallbackHandler
 import io.github.uharaqo.epoque.api.CommandExecutorOptions
-import io.github.uharaqo.epoque.api.CommandHandler
 import io.github.uharaqo.epoque.api.CommandHandlerOutput
+import io.github.uharaqo.epoque.api.CommandInput
+import io.github.uharaqo.epoque.api.CommandProcessor
+import io.github.uharaqo.epoque.api.CommandRouter
+import io.github.uharaqo.epoque.api.EpoqueContextKey
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_REJECTED
 import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
 
-fun interface CommandHandlerFactory<C, S, E> {
-  fun create(environment: EpoqueEnvironment): CommandHandler<C, S, E>
+/** build time */
+interface CommandHandlerRuntimeEnvironmentFactoryFactory {
+  fun create(
+    commandRouter: CommandRouter,
+    environment: EpoqueEnvironment,
+  ): CommandHandlerRuntimeEnvironmentFactory<Any, Any?, Any>
 }
 
-fun interface CommandHandlerBuilderFactory<C, S, E> {
-  suspend fun create(): CommandHandlerBuilder<C, S, E>
+/** routing time */
+interface CommandHandlerRuntimeEnvironmentFactory<C, S, E> : CommandProcessor, CommandRouter {
+  suspend fun create(): CommandHandlerRuntimeEnvironment<C, S, E>
 }
 
-interface CommandHandlerBuilder<C, S, E> : CommandHandlerSideEffects<E>, Raise<Throwable> {
+/** execution time */
+interface CommandHandlerRuntimeEnvironment<C, S, E> :
+  CommandHandlerOutputCollector<E>, CommandHandlerSideEffectHandler, CallbackHandler {
 
+  val preparedParam: Any?
+
+  companion object : EpoqueContextKey<CommandHandlerRuntimeEnvironment<*, *, *>>
+}
+
+interface CommandHandlerOutputCollector<E> {
   fun emit(event: E) = emit(listOf(event))
   fun emit(vararg events: E) = emit(events.toList())
   fun emit(events: List<E>, metadata: Map<Any, Any> = emptyMap())
@@ -28,11 +44,12 @@ interface CommandHandlerBuilder<C, S, E> : CommandHandlerSideEffects<E>, Raise<T
 
   fun reject(message: String, t: Throwable? = null): Nothing =
     throw COMMAND_REJECTED.toException(t, message)
-
-  override fun raise(r: Throwable): Nothing = throw r
 }
 
-interface CommandHandlerSideEffects<E> {
+interface CommandHandlerSideEffectHandler {
+  val notifications: List<suspend () -> Unit>
+  val chainedCommands: List<CommandInput>
+
   suspend fun exists(journal: Journal<*, *>, id: String?): Boolean =
     if (id == null) false else exists(JournalKey(journal.journalGroupId, JournalId(id)))
 

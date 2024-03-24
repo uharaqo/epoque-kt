@@ -1,11 +1,14 @@
 package io.github.uharaqo.epoque
 
+import io.github.uharaqo.epoque.api.CommandRouter
+import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.builder.CommandRouterFactory
 import io.github.uharaqo.epoque.builder.CommandRouterFactoryBuilder
 import io.github.uharaqo.epoque.builder.DataCodecFactory
 import io.github.uharaqo.epoque.builder.JournalBuilder
+import io.github.uharaqo.epoque.builder.toRouter
 
 object Epoque {
   inline fun <reified E : Any> journalFor(dataCodecFactory: DataCodecFactory): EpoqueBuilder<E> =
@@ -17,20 +20,23 @@ object Epoque {
   ): EpoqueBuilder<E> =
     EpoqueBuilder(journalGroupId, dataCodecFactory)
 
-  fun <S, E : Any> journalFor(
-    journalGroupId: JournalGroupId,
-    emptySummary: S,
-    dataCodecFactory: DataCodecFactory,
-    block: JournalBuilder<S, E>.() -> Unit,
-  ): Journal<S, E> =
-    EpoqueBuilder<E>(journalGroupId, dataCodecFactory).summaryFor(emptySummary, block)
-
   fun <C : Any, S, E : Any> routerFor(
     journal: Journal<S, E>,
     dataCodecFactory: DataCodecFactory,
     block: CommandRouterFactoryBuilder<C, S, E>.() -> Unit,
   ): CommandRouterFactory =
-    EpoqueBuilder<E>(journal.journalGroupId, dataCodecFactory).routerFor(journal, block)
+    EpoqueBuilderWithJournal(journal, dataCodecFactory).routerFor(block)
+
+  fun newRouter(
+    environment: EpoqueEnvironment,
+    vararg factories: CommandRouterFactory,
+  ): CommandRouter =
+    newRouter(environment, factories.toList())
+
+  fun newRouter(
+    environment: EpoqueEnvironment,
+    factories: List<CommandRouterFactory>,
+  ): CommandRouter = factories.toRouter(environment)
 }
 
 class EpoqueBuilder<E : Any>(
@@ -46,8 +52,7 @@ class EpoqueBuilder<E : Any>(
   fun <C : Any, S> routerFor(
     journal: Journal<S, E>,
     block: CommandRouterFactoryBuilder<C, S, E>.() -> Unit,
-  ): CommandRouterFactory =
-    CommandRouterFactory.create(journal, dataCodecFactory, block)
+  ): CommandRouterFactory = this.with(journal).routerFor(block)
 
   fun <S, E : Any> with(journal: Journal<S, E>): EpoqueBuilderWithJournal<S, E> =
     EpoqueBuilderWithJournal(journal, dataCodecFactory)

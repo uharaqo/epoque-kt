@@ -12,7 +12,7 @@ import io.github.uharaqo.epoque.api.DataCodec
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_NOT_SUPPORTED
 import io.github.uharaqo.epoque.api.Journal
-import io.github.uharaqo.epoque.api.JournalChecker
+import io.github.uharaqo.epoque.builder.CommandHandlerRuntimeEnvironment
 import io.github.uharaqo.epoque.builder.CommandProcessorFactory
 import io.github.uharaqo.epoque.builder.CommandRouterFactory
 import io.github.uharaqo.epoque.builder.CommandRouterFactoryBuilder
@@ -20,12 +20,6 @@ import io.github.uharaqo.epoque.builder.DataCodecFactory
 import io.github.uharaqo.epoque.builder.DefaultRegistry
 import io.github.uharaqo.epoque.builder.RegistryBuilder
 import io.github.uharaqo.epoque.builder.toCommandCodec
-
-fun CommandRouter.Companion.fromFactories(
-  environment: EpoqueEnvironment,
-  vararg factories: CommandRouterFactory,
-): CommandRouter =
-  fromFactories(environment, factories.toList())
 
 fun CommandRouter.Companion.fromFactories(
   environment: EpoqueEnvironment,
@@ -39,18 +33,38 @@ fun CommandRouter.Companion.fromFactories(
   val onError =
     { type: CommandType -> COMMAND_NOT_SUPPORTED.toException(message = type.toString()) }
 
-  return DefaultCommandRouter(
+  val defaultCommandRouter = DefaultCommandRouter(
     CommandCodecRegistry(DefaultRegistry(codecs, onError)),
     CommandProcessorRegistry(DefaultRegistry(processors, onError)),
   )
+  return environment.runtimeEnvironmentFactoryFactory.create(defaultCommandRouter, environment)
 }
 
+private class DefaultCommandRouter(
+  override val commandCodecRegistry: CommandCodecRegistry,
+  override val commandProcessorRegistry: CommandProcessorRegistry,
+) : CommandRouter
+
 private class DefaultCommandHandler<C, S, E>(
-  private val impl: suspend CommandHandlerBuilder<C, S, E>.(C, S) -> Unit,
-  private val runtimeEnvFactory: CommandHandlerBuilderFactory<C, S, E>,
+  private val impl: suspend CommandHandlerRuntimeEnvironment<C, S, E>.(C, S) -> Unit,
 ) : CommandHandler<C, S, E> {
   override suspend fun handle(c: C, s: S): CommandHandlerOutput<E> =
-    runtimeEnvFactory.create().apply { impl(c, s) }.complete()
+    @Suppress("UNCHECKED_CAST")
+    (CommandHandlerRuntimeEnvironment.get()!! as CommandHandlerRuntimeEnvironment<C, S, E>)
+      .apply { impl(c, s) }
+      .complete()
+}
+
+class DefaultPreparedCommandHandler<C, S, E, X>(
+  override val prepare: suspend (c: C) -> X?,
+  private val impl: suspend CommandHandlerRuntimeEnvironment<C, S, E>.(C, S, X?) -> Unit,
+) : PreparedCommandHandler<C, S, E> {
+  override suspend fun handle(c: C, s: S): CommandHandlerOutput<E> =
+    @Suppress("UNCHECKED_CAST")
+    CommandHandlerRuntimeEnvironment.get()!!.let { workflow ->
+      val x = workflow.preparedParam as X?
+      (workflow as CommandHandlerRuntimeEnvironment<C, S, E>).apply { impl(c, s, x) }.complete()
+    }
 }
 
 class DefaultCommandRouterFactoryBuilder<C : Any, S, E : Any>(
@@ -61,47 +75,36 @@ class DefaultCommandRouterFactoryBuilder<C : Any, S, E : Any>(
 
   override fun <CC : C> commandHandlerFor(
     codec: DataCodec<CC>,
-    handle: suspend CommandHandlerBuilder<CC, S, E>.(c: CC, s: S) -> Unit,
+    handle: suspend CommandHandlerRuntimeEnvironment<CC, S, E>.(c: CC, s: S) -> Unit,
   ) {
-    val handlerFactory = CommandHandlerFactory { env: EpoqueEnvironment ->
-      // TODO: no need to depend on env?
-      val journalChecker: JournalChecker = env.eventReader
+    val commandHandler = DefaultCommandHandler(handle)
 
-      val runtimeEnvFactory =
-        CommandHandlerBuilderFactory {
-          // retrieved at runtime
-          @Suppress("UNCHECKED_CAST")
-          val runtimeEnv =
-            CommandHandlerRuntimeEnvironment.get()!! as CommandHandlerRuntimeEnvironment<E>
-          DefaultCommandHandlerRuntime<CC, S, E>(runtimeEnv)
-        }
+    @Suppress("UNCHECKED_CAST")
+    register(codec as DataCodec<C>, commandHandler as CommandHandler<C, S, E>)
+  }
 
-      DefaultCommandHandler(handle, runtimeEnvFactory)
-    }
+  override fun <CC : C, X> commandHandlerFor(
+    codec: DataCodec<CC>,
+    prepare: suspend (c: CC) -> X?,
+    handle: suspend CommandHandlerRuntimeEnvironment<CC, S, E>.(c: CC, s: S, x: X?) -> Unit,
+  ) {
+    val commandHandler = DefaultPreparedCommandHandler(prepare, handle)
 
     @Suppress("UNCHECKED_CAST")
     register(
       codec = codec as DataCodec<C>,
-      commandHandlerFactory = handlerFactory as CommandHandlerFactory<C, S, E>,
+      commandHandler = commandHandler as CommandHandler<C, S, E>,
     )
   }
 
-  override fun register(
-    codec: DataCodec<C>,
-    commandHandlerFactory: CommandHandlerFactory<C, S, E>,
-  ) {
+  override fun register(codec: DataCodec<C>, commandHandler: CommandHandler<C, S, E>) {
     commandRouterFactory.register(codec) { env ->
-      env.create(journal, codec.toCommandCodec(), commandHandlerFactory)
+      env.newCommandExecutor(journal, codec.toCommandCodec(), commandHandler)
     }
   }
 
   override fun build(): CommandRouterFactory = commandRouterFactory
 }
-
-private class DefaultCommandRouter(
-  override val commandCodecRegistry: CommandCodecRegistry,
-  override val commandProcessorRegistry: CommandProcessorRegistry,
-) : CommandRouter
 
 private class DefaultCommandRouterFactory<C : Any, S, E : Any>(
   private val commandCodecRegistryBuilder: RegistryBuilder<CommandType, CommandCodec<*>> = RegistryBuilder(),

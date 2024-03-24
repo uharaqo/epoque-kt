@@ -62,7 +62,7 @@ abstract class TestEnvironment {
     }
   }
 
-  val TEST_COMMANDS = epoqueBuilder.routerFor<TestCommand, _>(TEST_JOURNAL) {
+  val TEST_COMMANDS = epoqueBuilder.with(TEST_JOURNAL).routerFor<TestCommand> {
     commandHandlerFor<TestCommand.Create> { c, s ->
       emit(dummyEvents)
     }
@@ -268,6 +268,7 @@ abstract class TestEnvironment {
     dummyTransactionStarter,
     CommandExecutorOptions(),
     dummyCallbackHandler,
+    DefaultCommandHandlerRuntimeEnvironmentFactoryFactory(),
   )
 
   @Suppress("UNCHECKED_CAST")

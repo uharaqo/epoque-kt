@@ -8,10 +8,11 @@ import io.github.uharaqo.epoque.impl.TestEnvironment.TestSummary
 import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import io.mockk.mockk
 
 class CommandRouterSpec : StringSpec(
   {
-    "command decoder and processor are found and executed properly" {
+    "Command decoder and processor are found and executed properly in a Workflow" {
       // given
       val commandRouter =
         Epoque
@@ -21,6 +22,7 @@ class CommandRouterSpec : StringSpec(
             }
           }
           .create(dummyEnvironment)
+          .let { DefaultCommandHandlerRuntimeEnvironmentFactory(it, mockk()) }
 
       // when
       val input = CommandInput(
