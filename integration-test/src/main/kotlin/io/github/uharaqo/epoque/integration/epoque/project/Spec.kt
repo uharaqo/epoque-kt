@@ -4,16 +4,15 @@ import io.github.uharaqo.epoque.Epoque
 import io.github.uharaqo.epoque.integration.epoque.task.CreateTask
 import io.github.uharaqo.epoque.serialization.JsonCodecFactory
 
-sealed interface Project {
-  data object Default : Project
-}
+// simple summary without any sub types
+data object Project
 
 private val builder = Epoque.journalFor<ProjectEvent>(JsonCodecFactory())
 
 val PROJECT_JOURNAL = builder.summaryFor<Project?>(null) {
   eventHandlerFor<ProjectCreated> { s, e ->
-    require(s == null) { "Project already exists" }
-    Project.Default
+    check(s == null) { "Project already exists" }
+    Project
   }
 }
 
