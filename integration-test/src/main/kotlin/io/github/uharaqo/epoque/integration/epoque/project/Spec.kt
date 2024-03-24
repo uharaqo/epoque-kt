@@ -5,16 +5,14 @@ import io.github.uharaqo.epoque.integration.epoque.task.CreateTask
 import io.github.uharaqo.epoque.serialization.JsonCodecFactory
 
 sealed interface Project {
-  data object Empty : Project
-
   data object Default : Project
 }
 
 private val builder = Epoque.journalFor<ProjectEvent>(JsonCodecFactory())
 
-val PROJECT_JOURNAL = builder.summaryFor<Project>(Project.Empty) {
+val PROJECT_JOURNAL = builder.summaryFor<Project?>(null) {
   eventHandlerFor<ProjectCreated> { s, e ->
-    require(s is Project.Empty) { "Project already exists" }
+    require(s == null) { "Project already exists" }
     Project.Default
   }
 }
@@ -24,15 +22,13 @@ val PROJECT_COMMANDS = builder.with(PROJECT_JOURNAL).routerFor<ProjectCommand> {
     { c -> "PREPARED" },
   ) { c, s, x ->
     println("Prepared Param: $x")
-    if (s is Project.Empty) {
-      chain("Foo", CreateTask("TaskX"))
-      notify {
-        println("NOTIFICATION SENT")
-      }
+    if (s != null) reject("Project already exists")
 
-      emit(c.toProjectCreated())
-    } else {
-      reject("Project already exists")
+    chain("Foo", CreateTask("TaskX"))
+    notify {
+      println("NOTIFICATION SENT")
     }
+
+    emit(c.toProjectCreated())
   }
 }

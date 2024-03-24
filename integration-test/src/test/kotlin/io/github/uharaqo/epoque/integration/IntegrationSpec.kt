@@ -1,5 +1,6 @@
 package io.github.uharaqo.epoque.integration
 
+import io.github.uharaqo.epoque.api.EpoqueException
 import io.github.uharaqo.epoque.builder.ProjectionRegistry
 import io.github.uharaqo.epoque.integration.TestEnvironment.RequestId
 import io.github.uharaqo.epoque.integration.epoque.project.CreateProject
@@ -20,8 +21,10 @@ import io.github.uharaqo.epoque.integration.epoque.task.TaskEnded
 import io.github.uharaqo.epoque.integration.epoque.task.TaskStarted
 import io.github.uharaqo.epoque.test.EpoqueTest
 import io.github.uharaqo.epoque.test.impl.DebugLogger
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.throwable.shouldHaveMessage
 import org.jooq.impl.DSL.table
 
 class IntegrationSpec : StringSpec(
@@ -51,6 +54,14 @@ My First Task,My First Task,Project1
       }
       EpoqueTest.newH2JooqContext().apply {
         selectFrom(table("task")).fetch().formatCSV(false) shouldBe "Foo,TaskX,\"\"\n"
+      }
+    }
+    "Register project again and fail" {
+      tester.forJournal(PROJECT_JOURNAL) {
+        shouldThrow<EpoqueException> {
+          command(projectId1, CreateProject(project1), meta) {
+          }
+        }.cause!! shouldHaveMessage "COMMAND_REJECTED: Project already exists"
       }
     }
     "Register task" {
