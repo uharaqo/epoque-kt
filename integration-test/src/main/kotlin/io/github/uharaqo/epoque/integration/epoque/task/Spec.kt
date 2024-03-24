@@ -22,7 +22,7 @@ val TASK_JOURNAL = builder.summaryFor<Task>(Task.Empty) {
 val TASK_COMMANDS = builder.with(TASK_JOURNAL).routerFor<TaskCommand> {
   commandHandlerFor<CreateTask> { c, s ->
     if (s !is Task.Empty) reject("Already created")
-    if (!exists(PROJECT_JOURNAL, c.project)) reject("Project Not Found")
+    if (c.project != null && !exists(PROJECT_JOURNAL, c.project)) reject("Project Not Found")
 
     emit(c.toTaskCreated())
   }

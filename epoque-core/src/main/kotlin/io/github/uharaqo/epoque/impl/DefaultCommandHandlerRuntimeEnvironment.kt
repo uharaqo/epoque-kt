@@ -2,6 +2,7 @@ package io.github.uharaqo.epoque.impl
 
 import arrow.core.flatMap
 import arrow.core.getOrElse
+import io.github.uharaqo.epoque.api.CommandCodecRegistry
 import io.github.uharaqo.epoque.api.CommandContext
 import io.github.uharaqo.epoque.api.CommandExecutorOptions
 import io.github.uharaqo.epoque.api.CommandHandler
@@ -25,6 +26,7 @@ import io.github.uharaqo.epoque.builder.CommandHandlerSideEffectHandler
 import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironment
 import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactory
 import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactoryFactory
+import io.github.uharaqo.epoque.builder.WithPreparedParam
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
 
@@ -50,8 +52,9 @@ class DefaultEpoqueRuntimeEnvironmentFactory(
 
   override suspend fun create(): EpoqueRuntimeEnvironment<Any, Any?, Any> {
     val outputCollector = DefaultCommandHandlerOutputCollector<Any>()
-    val sideEffectHandler = DefaultCommandHandlerSideEffectHandler(journalChecker, commandRouter)
-    return DefaultEpoqueRuntimeEnvironment(outputCollector, sideEffectHandler)
+    val sideEffectHandler =
+      DefaultCommandHandlerSideEffectHandler(journalChecker, commandRouter.commandCodecRegistry)
+    return DefaultEpoqueRuntimeEnvironment(outputCollector, sideEffectHandler, this)
   }
 
   override suspend fun process(input: CommandInput): Failable<CommandOutput> {
@@ -62,18 +65,20 @@ class DefaultEpoqueRuntimeEnvironmentFactory(
   }
 }
 
-class DefaultEpoqueRuntimeEnvironment(
+private class DefaultEpoqueRuntimeEnvironment(
   private val outputCollector: CommandHandlerOutputCollector<Any>,
   private val sideEffectHandler: CommandHandlerSideEffectHandler,
+  private val commandRouter: CommandRouter,
 ) :
   EpoqueRuntimeEnvironment<Any, Any?, Any>,
   CommandHandlerOutputCollector<Any> by outputCollector,
-  CommandHandlerSideEffectHandler by sideEffectHandler {
+  CommandHandlerSideEffectHandler by sideEffectHandler,
+  WithPreparedParam {
 
   private lateinit var x: Optional<Any>
 
-  override val preparedParam: Any?
-    get() = x.orElse(null)
+  @Suppress("UNCHECKED_CAST")
+  override fun <X> getPreparedParam(): X? = x.orElse(null) as X?
 
   override suspend fun beforeBegin(context: CommandContext) {
     @Suppress("UNCHECKED_CAST")
@@ -92,9 +97,8 @@ class DefaultEpoqueRuntimeEnvironment(
 
   override suspend fun beforeCommit(output: CommandOutput) {
     sideEffectHandler.chainedCommands.forEach { command ->
-      println("---")
-      println("TODO: execute this: $command")
-      println("---")
+      // TODO: result handling
+      commandRouter.process(command).getOrElse { throw it }
     }
   }
 
@@ -105,7 +109,7 @@ class DefaultEpoqueRuntimeEnvironment(
 }
 
 /** Created for each command request to collect outputs */
-class DefaultCommandHandlerOutputCollector<E> : CommandHandlerOutputCollector<E> {
+private class DefaultCommandHandlerOutputCollector<E> : CommandHandlerOutputCollector<E> {
   private val events = ConcurrentLinkedQueue<E>()
   private var metadata = mutableMapOf<Any, Any>()
 
@@ -119,9 +123,9 @@ class DefaultCommandHandlerOutputCollector<E> : CommandHandlerOutputCollector<E>
   }
 }
 
-class DefaultCommandHandlerSideEffectHandler(
+private class DefaultCommandHandlerSideEffectHandler(
   private val journalChecker: JournalChecker,
-  private val router: CommandRouter,
+  private val commandCodecRegistry: CommandCodecRegistry,
 ) : CommandHandlerSideEffectHandler {
   private val _chainedCommands = ConcurrentLinkedQueue<CommandInput>()
   private val _notifications = ConcurrentLinkedQueue<suspend () -> Unit>()
@@ -146,7 +150,7 @@ class DefaultCommandHandlerSideEffectHandler(
   ) {
     val type = CommandType.of(command::class.java)
     val serialized =
-      router.commandCodecRegistry.find<Any>(type).flatMap { it.encode(command) }
+      commandCodecRegistry.find<Any>(type).flatMap { it.encode(command) }
         .getOrElse { throw it }
     _chainedCommands += CommandInput(id, type, serialized, metadata, options)
   }

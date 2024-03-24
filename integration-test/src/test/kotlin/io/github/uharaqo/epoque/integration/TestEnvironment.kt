@@ -27,7 +27,7 @@ abstract class TestEnvironment {
           |CREATE TABLE IF NOT EXISTS task (
           |  id VARCHAR(255) NOT NULL,
           |  name TEXT NOT NULL,
-          |  project_id TEXT NOT NULL REFERENCES project(id),
+          |  project_id TEXT REFERENCES project(id),
           |  PRIMARY KEY (id)
           |);
           |

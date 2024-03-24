@@ -12,6 +12,7 @@ import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_REJECTED
 import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
+import io.github.uharaqo.epoque.impl.DefaultEpoqueRuntimeEnvironmentFactoryFactory
 
 /** build time */
 interface EpoqueRuntimeEnvironmentFactoryFactory {
@@ -19,6 +20,11 @@ interface EpoqueRuntimeEnvironmentFactoryFactory {
     commandRouter: CommandRouter,
     environment: EpoqueEnvironment,
   ): EpoqueRuntimeEnvironmentFactory<Any, Any?, Any>
+
+  companion object {
+    fun create(): EpoqueRuntimeEnvironmentFactoryFactory =
+      DefaultEpoqueRuntimeEnvironmentFactoryFactory()
+  }
 }
 
 /** routing time */
@@ -30,9 +36,12 @@ interface EpoqueRuntimeEnvironmentFactory<C, S, E> : CommandProcessor, CommandRo
 interface EpoqueRuntimeEnvironment<C, S, E> :
   CommandHandlerOutputCollector<E>, CommandHandlerSideEffectHandler, CallbackHandler {
 
-  val preparedParam: Any?
-
   companion object : EpoqueContextKey<EpoqueRuntimeEnvironment<*, *, *>>
+}
+
+interface WithPreparedParam {
+
+  fun <X> getPreparedParam(): X?
 }
 
 interface CommandHandlerOutputCollector<E> {

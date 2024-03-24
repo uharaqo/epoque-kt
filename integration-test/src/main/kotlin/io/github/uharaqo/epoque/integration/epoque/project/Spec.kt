@@ -23,9 +23,7 @@ val PROJECT_COMMANDS = builder.with(PROJECT_JOURNAL).routerFor<ProjectCommand> {
   commandHandlerFor<CreateProject, String>(
     { c -> "PREPARED" },
   ) { c, s, x ->
-    println("=-=")
-    println("[[[$x]]]")
-    println("=-=")
+    println("Prepared Param: $x")
     if (s is Project.Empty) {
       chain("Foo", CreateTask("TaskX"))
       notify {

@@ -19,6 +19,7 @@ import io.github.uharaqo.epoque.builder.DataCodecFactory
 import io.github.uharaqo.epoque.builder.DefaultRegistry
 import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironment
 import io.github.uharaqo.epoque.builder.RegistryBuilder
+import io.github.uharaqo.epoque.builder.WithPreparedParam
 import io.github.uharaqo.epoque.builder.toCommandCodec
 
 fun CommandRouter.Companion.fromFactories(
@@ -62,7 +63,7 @@ class DefaultPreparedCommandHandler<C, S, E, X>(
   override suspend fun handle(c: C, s: S): CommandHandlerOutput<E> =
     @Suppress("UNCHECKED_CAST")
     EpoqueRuntimeEnvironment.get()!!.let { workflow ->
-      val x = workflow.preparedParam as X?
+      val x = if (workflow is WithPreparedParam) workflow.getPreparedParam<X>() else null
       (workflow as EpoqueRuntimeEnvironment<C, S, E>).apply { impl(c, s, x) }.complete()
     }
 }

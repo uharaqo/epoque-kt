@@ -32,6 +32,7 @@ import io.github.uharaqo.epoque.api.TransactionStarter
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
 import io.github.uharaqo.epoque.api.WriteOption
+import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactoryFactory
 import io.github.uharaqo.epoque.builder.EventCodecRegistryBuilder
 import io.github.uharaqo.epoque.builder.RegistryBuilder
 import io.github.uharaqo.epoque.builder.toCommandCodec
@@ -41,11 +42,11 @@ import io.github.uharaqo.epoque.serialization.SerializedJson
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
-import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
+import java.time.Instant
 
 abstract class TestEnvironment {
   val jsonCodecFactory = JsonCodecFactory()
@@ -268,7 +269,7 @@ abstract class TestEnvironment {
     dummyTransactionStarter,
     CommandExecutorOptions(),
     dummyCallbackHandler,
-    DefaultEpoqueRuntimeEnvironmentFactoryFactory(),
+    EpoqueRuntimeEnvironmentFactoryFactory.create(),
   )
 
   @Suppress("UNCHECKED_CAST")
