@@ -24,7 +24,6 @@ import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
-import io.github.uharaqo.epoque.api.LockOption
 import io.github.uharaqo.epoque.api.OutputMetadata
 import io.github.uharaqo.epoque.api.SerializedCommand
 import io.github.uharaqo.epoque.api.SerializedEvent
@@ -32,6 +31,11 @@ import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.TransactionStarter
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
+import io.github.uharaqo.epoque.api.WriteOption
+import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactoryFactory
+import io.github.uharaqo.epoque.builder.EventCodecRegistryBuilder
+import io.github.uharaqo.epoque.builder.RegistryBuilder
+import io.github.uharaqo.epoque.builder.toCommandCodec
 import io.github.uharaqo.epoque.serialization.JsonCodec
 import io.github.uharaqo.epoque.serialization.JsonCodecFactory
 import io.github.uharaqo.epoque.serialization.SerializedJson
@@ -42,6 +46,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
+import java.time.Instant
 
 abstract class TestEnvironment {
   val jsonCodecFactory = JsonCodecFactory()
@@ -58,7 +63,7 @@ abstract class TestEnvironment {
     }
   }
 
-  val TEST_COMMANDS = epoqueBuilder.routerFor<TestCommand, _, _>(TEST_JOURNAL) {
+  val TEST_COMMANDS = epoqueBuilder.with(TEST_JOURNAL).routerFor<TestCommand> {
     commandHandlerFor<TestCommand.Create> { c, s ->
       emit(dummyEvents)
     }
@@ -124,14 +129,14 @@ abstract class TestEnvironment {
   }
 
   val dummyTransactionContext = object : TransactionContext {
-    override val lockOption: LockOption = LockOption.DEFAULT
+    override val writeOption: WriteOption = WriteOption.DEFAULT
     override val lockedKeys: Set<JournalKey> = emptySet()
   }
 
   val dummyTransactionStarter = object : TransactionStarter {
     override suspend fun <T> startTransactionAndLock(
       key: JournalKey,
-      lockOption: LockOption,
+      writeOption: WriteOption,
       block: suspend (tx: TransactionContext) -> T,
     ): Failable<T> = block(dummyTransactionContext).right()
 
@@ -140,6 +145,7 @@ abstract class TestEnvironment {
   }
 
   val dummyCommandType = CommandType.of<TestCommand.Create>()
+  val dummyCommandDecoder = JsonCodec.of<TestCommand.Create>().toCommandCodec()
   val dummyCommandHandler =
     CommandHandler<TestCommand, MockSummary, TestEvent> { c, s ->
       @Suppress("UNCHECKED_CAST")
@@ -167,12 +173,14 @@ abstract class TestEnvironment {
     dummyEventCodecRegistry,
   )
 
+  val dummyReceivedTime = Instant.now()
   val dummyCommandContext = CommandContext(
     dummyJournalKey,
     dummyCommandType,
     serializedCommand,
     InputMetadata.EMPTY,
     CommandExecutorOptions(),
+    dummyReceivedTime,
   )
 
   val dummyCallbackHandler = object : CallbackHandler {
@@ -236,10 +244,10 @@ abstract class TestEnvironment {
 
     override suspend fun <T> startTransactionAndLock(
       key: JournalKey,
-      lockOption: LockOption,
+      writeOption: WriteOption,
       block: suspend (tx: TransactionContext) -> T,
     ): Failable<T> =
-      dummyTransactionStarter.startTransactionAndLock(key, lockOption, block)
+      dummyTransactionStarter.startTransactionAndLock(key, writeOption, block)
 
     override suspend fun <T> startDefaultTransaction(block: suspend (tx: TransactionContext) -> T): Failable<T> =
       dummyTransactionStarter.startDefaultTransaction(block)
@@ -250,9 +258,8 @@ abstract class TestEnvironment {
   ): CommandExecutor<TestCommand, MockSummary, TestEvent> {
     val mock = mockk<CommandExecutor<TestCommand, MockSummary, TestEvent>>()
     every { mock.journalGroupId.unwrap } returns CommandRouterSpec.dummyJournalKey.groupId.unwrap
-    every { mock.defaultCommandExecutorOptions } returns CommandExecutorOptions()
     every { mock.eventCodecRegistry } returns CommandRouterSpec.dummyEventCodecRegistry
-    coEvery { mock.execute(any(), any()) } returns commandOutput.right()
+    coEvery { mock.execute(any(), any(), any(), any()) } returns commandOutput.right()
     return mock
   }
 
@@ -262,6 +269,7 @@ abstract class TestEnvironment {
     dummyTransactionStarter,
     CommandExecutorOptions(),
     dummyCallbackHandler,
+    EpoqueRuntimeEnvironmentFactoryFactory.create(),
   )
 
   @Suppress("UNCHECKED_CAST")
@@ -270,6 +278,7 @@ abstract class TestEnvironment {
   ): CommandExecutor<TestCommand, MockSummary, TestEvent> {
     return CommandExecutor(
       dummyJournalKey.groupId,
+      dummyCommandDecoder,
       dummyCommandHandler,
       dummyEventCodecRegistry,
       dummyEventHandlerExecutor,
@@ -277,7 +286,7 @@ abstract class TestEnvironment {
       eventWriter ?: dummyEnvironment.eventWriter,
       dummyEnvironment.transactionStarter,
       dummyEnvironment.defaultCommandExecutorOptions,
-      dummyEnvironment.callbackHandler,
+      dummyEnvironment.callbackHandler ?: CallbackHandler.EMPTY,
     )
   }
 }

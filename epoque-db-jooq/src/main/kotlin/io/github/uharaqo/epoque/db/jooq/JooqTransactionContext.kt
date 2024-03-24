@@ -1,13 +1,13 @@
 package io.github.uharaqo.epoque.db.jooq
 
 import io.github.uharaqo.epoque.api.JournalKey
-import io.github.uharaqo.epoque.api.LockOption
 import io.github.uharaqo.epoque.api.TransactionContext
+import io.github.uharaqo.epoque.api.WriteOption
 import org.jooq.DSLContext
 
 data class JooqTransactionContext(
   val ctx: DSLContext,
-  override val lockOption: LockOption,
+  override val writeOption: WriteOption,
   override val lockedKeys: Set<JournalKey>,
 ) : TransactionContext
 

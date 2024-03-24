@@ -7,8 +7,8 @@ import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.Projection
 import io.github.uharaqo.epoque.api.ProjectionEvent
 import io.github.uharaqo.epoque.api.TransactionContext
-import io.github.uharaqo.epoque.impl.ProjectionRegistry
-import io.github.uharaqo.epoque.impl.RegistryBuilder
+import io.github.uharaqo.epoque.builder.ProjectionRegistry
+import io.github.uharaqo.epoque.builder.RegistryBuilder
 
 fun interface JooqProjection<E> {
   suspend fun JooqTransactionContext.process(event: ProjectionEvent<E>)

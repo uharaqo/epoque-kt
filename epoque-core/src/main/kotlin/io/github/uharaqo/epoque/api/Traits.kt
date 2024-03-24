@@ -6,10 +6,6 @@ import arrow.core.raise.ensure
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_HANDLER_FAILURE
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_HANDLER_FAILURE
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.SUMMARY_AGGREGATION_FAILURE
-import io.github.uharaqo.epoque.api.EpoqueException.Cause.TIMEOUT_EXCEPTION
-import io.github.uharaqo.epoque.api.EpoqueException.Cause.UNKNOWN_EXCEPTION
-import java.time.Instant
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.toList
 
 /** Serialize events by using [EventHandlerRegistry]. */
@@ -37,7 +33,7 @@ interface CanSerializeEvents<E : Any> {
 }
 
 /** Write events by using [EventWriter]. */
-interface CanWriteEvents<E : Any> {
+interface CanWriteEvents<E> {
   val eventWriter: EventWriter
 }
 
@@ -45,7 +41,7 @@ interface CanWriteEvents<E : Any> {
  * Provide a Summary [S] as an [EventHandlerExecutor] by aggregating events using
  * [EventHandlerRegistry] and [EventCodecRegistry].
  */
-interface CanComputeNextSummary<S, E : Any> : EventHandlerExecutor<S> {
+interface CanComputeNextSummary<S, E> : EventHandlerExecutor<S> {
   val eventHandlerRegistry: EventHandlerRegistry<S, E>
   val eventCodecRegistry: EventCodecRegistry
 
@@ -122,29 +118,7 @@ interface CanLoadSummary<S> : CanAggregateEvents<S> {
 interface CanExecuteCommandHandler<C, S, E : Any> :
   CanLoadSummary<S>,
   CanSerializeEvents<E>,
-  CanWriteEvents<E>,
-  TransactionStarter {
-
-  val journalGroupId: JournalGroupId
-  val commandHandler: CommandHandler<C, S, E>
-  val defaultCommandExecutorOptions: CommandExecutorOptions?
-  val callbackHandler: CallbackHandler?
-
-  suspend fun execute(command: C, context: CommandContext): Failable<CommandOutput> =
-    either {
-      catchWithTimeout(context.options.timeoutMillis) {
-        callbackHandler?.beforeBegin(context)
-
-        startTransactionAndLock(context.key, context.options.lockOption) { tx ->
-          callbackHandler?.afterBegin(context)
-
-          execute(command, commandHandler, context, tx).bind()
-            .also { callbackHandler?.beforeCommit(it) }
-        }.bind()
-      }.bind()
-    }
-      .onRight { callbackHandler?.afterCommit(it) }
-      .onLeft { callbackHandler?.afterRollback(context, it) }
+  CanWriteEvents<E> {
 
   suspend fun execute(
     command: C,
@@ -166,55 +140,4 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
 
     output
   }
-
-  private suspend inline fun <T> catchWithTimeout(
-    timeoutMillis: Long,
-    crossinline block: suspend () -> T,
-  ): Failable<T> =
-    Either.catch { kotlinx.coroutines.withTimeout(timeoutMillis) { block() } }
-      .mapLeft {
-        when (it) {
-          is EpoqueException -> it
-          is TimeoutCancellationException -> TIMEOUT_EXCEPTION.toException(it)
-          else -> UNKNOWN_EXCEPTION.toException(it)
-        }
-      }
-}
-
-/** Deserialize a command by using [CommandCodec] and execute it by using [CanExecuteCommandHandler]. */
-interface CanProcessCommand<C> : CommandProcessor {
-  val commandDecoder: CommandDecoder<C>
-  val executor: CanExecuteCommandHandler<C, *, *>
-
-  override suspend fun process(input: CommandInput): Failable<CommandOutput> =
-    either {
-      val command = commandDecoder.decode(input.payload).bind()
-
-      val commandContext =
-        CommandContext(
-          key = JournalKey(executor.journalGroupId, input.id),
-          commandType = input.type,
-          command = input.payload,
-          metadata = input.metadata.asInputMetadata(),
-          options = input.getCommandExecutorOptions().refreshTimeoutMillis(),
-          receivedTime = Instant.now(),
-        )
-
-      EpoqueContext.with(
-        {
-          add(CommandContext, commandContext)
-          add(EventCodecRegistry, executor.eventCodecRegistry)
-        },
-      ) { executor.execute(command, commandContext).bind() }
-    }
-
-  private fun CommandInput.getCommandExecutorOptions(): CommandExecutorOptions =
-    commandExecutorOptions
-      ?: executor.defaultCommandExecutorOptions
-      ?: CommandExecutorOptions()
-
-  private suspend fun CommandExecutorOptions.refreshTimeoutMillis(): CommandExecutorOptions =
-    CommandContext.get()?.getRemainingTimeMillis()
-      ?.let { this.copy(timeoutMillis = it) }
-      ?: this
 }

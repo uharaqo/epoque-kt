@@ -5,7 +5,6 @@ import io.github.uharaqo.epoque.Epoque
 import io.github.uharaqo.epoque.api.CanAggregateEvents
 import io.github.uharaqo.epoque.api.CommandInput
 import io.github.uharaqo.epoque.api.CommandOutput
-import io.github.uharaqo.epoque.api.CommandProcessor
 import io.github.uharaqo.epoque.api.EventWriter
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedSummary
@@ -42,7 +41,7 @@ class JournalSpec : StringSpec(
       val environment = dummyEnvironment.copy(eventWriter = eventWriter)
 
       val codec = dummyCommandCodecRegistry.find(dummyCommandType).rethrow()
-      val processor: CommandProcessor =
+      val processor =
         Epoque
           .routerFor<TestCommand, TestSummary, TestEvent>(TEST_JOURNAL, jsonCodecFactory) {
             commandHandlerFor<TestCommand.Create> { c, s ->
@@ -50,6 +49,7 @@ class JournalSpec : StringSpec(
             }
           }
           .create(environment)
+          .let { DefaultEpoqueRuntimeEnvironmentFactory(it, mockk()) }
 
       // when
       val command = TestCommand.Create("Integration")

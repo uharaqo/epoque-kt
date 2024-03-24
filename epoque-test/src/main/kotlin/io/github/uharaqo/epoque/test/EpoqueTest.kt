@@ -1,21 +1,19 @@
 package io.github.uharaqo.epoque.test
 
+import io.github.uharaqo.epoque.Epoque
 import io.github.uharaqo.epoque.api.CallbackHandler
 import io.github.uharaqo.epoque.api.CommandExecutorOptions
-import io.github.uharaqo.epoque.api.CommandRouter
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.EventStore
-import io.github.uharaqo.epoque.api.LockOption.LOCK_JOURNAL
+import io.github.uharaqo.epoque.api.WriteOption.LOCK_JOURNAL
+import io.github.uharaqo.epoque.builder.CommandRouterFactory
+import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactoryFactory
 import io.github.uharaqo.epoque.db.jooq.JooqEventStore
 import io.github.uharaqo.epoque.db.jooq.TableDefinition
 import io.github.uharaqo.epoque.db.jooq.h2.H2JooqQueries
-import io.github.uharaqo.epoque.impl.CommandRouterFactory
-import io.github.uharaqo.epoque.impl.DefaultCommandRouter
-import io.github.uharaqo.epoque.impl.fromFactories
 import io.github.uharaqo.epoque.test.api.Tester
 import io.github.uharaqo.epoque.test.impl.DebugLogger
 import io.github.uharaqo.epoque.test.impl.DefaultTester
-import java.sql.DriverManager
 import org.jooq.DSLContext
 import org.jooq.JSONB
 import org.jooq.SQLDialect
@@ -23,8 +21,12 @@ import org.jooq.conf.RenderNameCase
 import org.jooq.conf.RenderQuotedNames
 import org.jooq.conf.Settings
 import org.jooq.impl.DSL
+import java.sql.DriverManager
 
 object EpoqueTest {
+  val runtimeEnvironmentFactoryFactory: EpoqueRuntimeEnvironmentFactoryFactory =
+    EpoqueRuntimeEnvironmentFactoryFactory.create()
+
   fun newH2JooqContext(): DSLContext =
     DriverManager.getConnection(
       "jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=TRUE",
@@ -52,18 +54,25 @@ object EpoqueTest {
     eventStore: EventStore = newH2EventStore(),
     options: CommandExecutorOptions = CommandExecutorOptions(
       timeoutMillis = 30000,
-      lockOption = LOCK_JOURNAL,
+      writeOption = LOCK_JOURNAL,
     ),
     callbackHandler: CallbackHandler = DebugLogger(),
   ): EpoqueEnvironment =
-    EpoqueEnvironment(eventStore, eventStore, eventStore, options, callbackHandler)
+    EpoqueEnvironment(
+      eventReader = eventStore,
+      eventWriter = eventStore,
+      transactionStarter = eventStore,
+      defaultCommandExecutorOptions = options,
+      callbackHandler = callbackHandler,
+      runtimeEnvironmentFactoryFactory = runtimeEnvironmentFactoryFactory,
+    )
 
   fun newTester(
     environment: EpoqueEnvironment,
     vararg commandRouterFactories: CommandRouterFactory,
   ): Tester {
-    val router = CommandRouter.fromFactories(environment, commandRouterFactories.toList())
+    val router = Epoque.newRouter(environment, *commandRouterFactories)
 
-    return DefaultTester(router as DefaultCommandRouter, environment)
+    return DefaultTester(router, environment)
   }
 }

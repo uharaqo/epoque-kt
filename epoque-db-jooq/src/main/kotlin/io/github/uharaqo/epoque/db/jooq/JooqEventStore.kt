@@ -13,10 +13,10 @@ import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_WRITE_FAILURE
 import io.github.uharaqo.epoque.api.EventStore
 import io.github.uharaqo.epoque.api.Failable
 import io.github.uharaqo.epoque.api.JournalKey
-import io.github.uharaqo.epoque.api.LockOption
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
+import io.github.uharaqo.epoque.api.WriteOption
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -62,7 +62,7 @@ class JooqEventStore<D>(
 
   private suspend fun <T> runTransaction(
     ctx: DSLContext,
-    lockOption: LockOption,
+    writeOption: WriteOption,
     lockedKeys: Set<JournalKey>,
     block: suspend (tx: TransactionContext) -> T,
     beforeExecute: suspend (DSLContext) -> Unit = {},
@@ -73,8 +73,8 @@ class JooqEventStore<D>(
     return ctx.transactionCoroutine(coroutineCtx + Dispatchers.IO) { conf ->
       // setting the timeout again because the TimeoutCoroutine was removed as a Job
       withTimeout(getRemainingMillisToTimeout()) {
-        val tx = JooqTransactionContext(conf.dsl(), lockOption, lockedKeys)
-        EpoqueContext.with({ add(TransactionContext, tx) }) {
+        val tx = JooqTransactionContext(conf.dsl(), writeOption, lockedKeys)
+        EpoqueContext.with({ put(TransactionContext, tx) }) {
           // explicitly throw exception to roll back the transaction
           tx.asJooq { beforeExecute(this.ctx) }
           block(tx)
@@ -90,31 +90,31 @@ class JooqEventStore<D>(
         val elapsedMillis = System.currentTimeMillis() - context.receivedTime.toEpochMilli()
         timeoutMillis - elapsedMillis
       }
-      ?: CommandExecutorOptions().timeoutMillis
+      ?: CommandExecutorOptions.DEFAULT.timeoutMillis
 
   override suspend fun <T> startDefaultTransaction(block: suspend (tx: TransactionContext) -> T): Failable<T> =
     Either.catch {
       getTransactionContext()
         ?.let { block(it) }
-        ?: runTransaction(originalContext, LockOption.DEFAULT, emptySet(), block)
+        ?: runTransaction(originalContext, WriteOption.DEFAULT, emptySet(), block)
     }.mapLeft { it.toEpoqueException() }
 
   override suspend fun <T> startTransactionAndLock(
     key: JournalKey,
-    lockOption: LockOption,
+    writeOption: WriteOption,
     block: suspend (tx: TransactionContext) -> T,
   ): Failable<T> =
-    when (lockOption) {
-      LockOption.DEFAULT -> startDefaultTransaction(block)
+    when (writeOption) {
+      WriteOption.DEFAULT -> startDefaultTransaction(block)
 
-      LockOption.LOCK_JOURNAL -> Either.catch {
+      WriteOption.LOCK_JOURNAL -> Either.catch {
         val prevTx = getTransactionContext()
         val locked = prevTx?.asJooq { lockedKeys } ?: emptySet()
         if (key in locked) return@catch block(prevTx!!)
 
         val prevCtx = prevTx?.asJooq { ctx } ?: originalContext
 
-        runTransaction(prevCtx, lockOption, locked + key, block) { ctx ->
+        runTransaction(prevCtx, writeOption, locked + key, block) { ctx ->
           queries.lockNextEvent(ctx, key).getOrElse { throw it }
         }
       }.mapLeft { it.toEpoqueException() }

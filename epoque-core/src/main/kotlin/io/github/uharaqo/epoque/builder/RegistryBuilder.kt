@@ -1,4 +1,4 @@
-package io.github.uharaqo.epoque.impl
+package io.github.uharaqo.epoque.builder
 
 import arrow.core.left
 import arrow.core.right

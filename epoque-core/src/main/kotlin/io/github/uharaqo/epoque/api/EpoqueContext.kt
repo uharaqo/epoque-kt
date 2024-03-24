@@ -8,7 +8,7 @@ import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CoroutineScope
 
 class EpoqueContext private constructor(
-  private val map: Map<EpoqueContextKey<*>, Any>,
+  private val map: Map<EpoqueContextKey<*>, Any?>,
 ) : CoroutineContext.Element {
 
   override val key = Companion
@@ -16,9 +16,6 @@ class EpoqueContext private constructor(
   operator fun <V> get(key: EpoqueContextKey<V>): V? =
     @Suppress("UNCHECKED_CAST")
     map[key]?.let { it as V }
-
-  fun <V> with(key: EpoqueContextKey<V>, value: V): EpoqueContext =
-    DefaultBuilder(this).also { it.add(key, value) }.build()
 
   @OptIn(ExperimentalContracts::class)
   suspend fun <T> withContext(block: suspend CoroutineScope.() -> T): T {
@@ -42,21 +39,30 @@ class EpoqueContext private constructor(
       DefaultBuilder(getOrCreate()).apply(block).build()
 
     suspend fun <T> with(configure: Builder.() -> Unit, block: suspend CoroutineScope.() -> T): T =
-      Companion.with(configure).withContext(block)
+      with(configure).withContext(block)
   }
 
   interface Builder {
-    fun <V> add(key: EpoqueContextKey<V>, value: V)
+    fun <V> put(key: EpoqueContextKey<V>, value: V)
+    suspend fun <V> map(key: EpoqueContextKey<V>, f: suspend (V?) -> V)
   }
 
-  private class DefaultBuilder(original: EpoqueContext?) : Builder {
-    private val map = original?.map?.toMutableMap() ?: mutableMapOf()
+  private class DefaultBuilder(private val original: EpoqueContext?) : Builder {
+    private val map = mutableMapOf<EpoqueContextKey<*>, Any?>()
 
-    override fun <V> add(key: EpoqueContextKey<V>, value: V) {
-      map += (key to value as Any)
+    override fun <V> put(key: EpoqueContextKey<V>, value: V) {
+      map += (key to value as Any?)
     }
 
-    fun build(): EpoqueContext = EpoqueContext(map)
+    override suspend fun <V> map(key: EpoqueContextKey<V>, f: suspend (V?) -> V) {
+      @Suppress("UNCHECKED_CAST")
+      map[key] = f(map[key] as V?)
+    }
+
+    fun build(): EpoqueContext =
+      original
+        ?.let { if (map.isNotEmpty()) EpoqueContext(it.map + map) else it }
+        ?: EpoqueContext(map)
   }
 }
 

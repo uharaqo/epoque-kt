@@ -1,5 +1,6 @@
 package io.github.uharaqo.epoque.api
 
+import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactoryFactory
 import java.time.Instant
 
 @JvmInline
@@ -78,8 +79,12 @@ data class CommandOutput(
 
 data class CommandExecutorOptions(
   val timeoutMillis: Long = 5000L,
-  val lockOption: LockOption = LockOption.DEFAULT,
-)
+  val writeOption: WriteOption = WriteOption.DEFAULT,
+) {
+  companion object {
+    val DEFAULT = CommandExecutorOptions()
+  }
+}
 
 data class EpoqueEnvironment(
   val eventReader: EventReader,
@@ -87,6 +92,7 @@ data class EpoqueEnvironment(
   val transactionStarter: TransactionStarter,
   val defaultCommandExecutorOptions: CommandExecutorOptions?,
   val callbackHandler: CallbackHandler?,
+  val runtimeEnvironmentFactoryFactory: EpoqueRuntimeEnvironmentFactoryFactory,
 )
 
 interface Registry<K : Any, V : Any> {

@@ -15,12 +15,6 @@ interface DataDecoder<out V> {
   fun decode(serialized: SerializedData): V
 }
 
-interface DataCodecFactory {
-  fun <V : Any> create(type: Class<V>): DataCodec<V>
-}
-
-inline fun <reified V : Any> DataCodecFactory.codecFor() = create(V::class.java)
-
 interface DataCodec<V> : DataEncoder<V>, DataDecoder<V>
 
 @JvmInline
@@ -59,8 +53,6 @@ value class EventCodecRegistry(
   fun <E> find(type: EventType): Failable<EventCodec<E>> =
     @Suppress("UNCHECKED_CAST")
     codecs.find(type).map { it as EventCodec<E> }
-
-  companion object : EpoqueContextKey<EventCodecRegistry>
 }
 
 @JvmInline
@@ -101,6 +93,4 @@ value class CommandCodecRegistry(
     codecs.find(type).map { it as CommandCodec<C> }
 
   fun toMap(): Map<CommandType, CommandCodec<*>> = codecs.toMap()
-
-  companion object : EpoqueContextKey<CommandCodecRegistry>
 }

@@ -1,11 +1,9 @@
-package io.github.uharaqo.epoque.impl
+package io.github.uharaqo.epoque.builder
 
-import arrow.core.raise.catch
 import arrow.core.raise.either
 import io.github.uharaqo.epoque.api.CommandCodec
 import io.github.uharaqo.epoque.api.DataCodec
-import io.github.uharaqo.epoque.api.DataCodecFactory
-import io.github.uharaqo.epoque.api.EpoqueException.Cause
+import io.github.uharaqo.epoque.api.EpoqueException
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_DECODING_FAILURE
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_ENCODING_FAILURE
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_NOT_SUPPORTED
@@ -19,7 +17,12 @@ import io.github.uharaqo.epoque.api.Failable
 import io.github.uharaqo.epoque.api.SerializedCommand
 import io.github.uharaqo.epoque.api.SerializedData
 import io.github.uharaqo.epoque.api.SerializedEvent
-import io.github.uharaqo.epoque.api.codecFor
+
+interface DataCodecFactory {
+  fun <V : Any> create(type: Class<V>): DataCodec<V>
+}
+
+inline fun <reified V : Any> DataCodecFactory.codecFor() = create(V::class.java)
 
 class EventCodecRegistryBuilder<E : Any>(val codecFactory: DataCodecFactory) {
   private val registry = RegistryBuilder<EventType, EventCodec<*>>()
@@ -60,26 +63,26 @@ fun <C : Any> DataCodec<C>.toCommandCodec(): CommandCodec<C> =
   )
     .let { CommandCodec(it::encode, it::decode) }
 
-class DataCodecAdapter<V : Any, W>(
+private class DataCodecAdapter<V : Any, W>(
   private val codec: DataCodec<V>,
   private val wrapper: (SerializedData) -> W,
   private val unwrapper: (W) -> SerializedData,
-  private val notSupported: Cause,
-  private val encodingFailure: Cause,
-  private val decodingFailure: Cause,
+  private val notSupported: EpoqueException.Cause,
+  private val encodingFailure: EpoqueException.Cause,
+  private val decodingFailure: EpoqueException.Cause,
 ) {
   fun encode(v: V): Failable<W> = either {
     if (!codec.type.isInstance(v)) {
       raise(notSupported.toException(message = v::class.java.canonicalName ?: v.toString()))
     }
 
-    catch({ codec.encode(v).let(wrapper) }) {
+    arrow.core.raise.catch({ codec.encode(v).let(wrapper) }) {
       raise(encodingFailure.toException(it, codec.type.toString()))
     }
   }
 
   fun decode(serialized: W): Failable<V> = either {
-    catch({ codec.decode(unwrapper(serialized)) }) {
+    arrow.core.raise.catch({ codec.decode(unwrapper(serialized)) }) {
       raise(decodingFailure.toException(it, codec.type.toString()))
     }
       .also { v ->

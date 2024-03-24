@@ -22,7 +22,12 @@ class CommandExecutorSpec : StringSpec(
       val dummyCommandExecutor = dummyCommandExecutor(eventWriter)
 
       // when
-      val output = dummyCommandExecutor.execute(Create("Whatever"), dummyCommandContext).rethrow()
+      val output = dummyCommandExecutor.execute(
+        Create("Whatever"),
+        dummyCommandHandler,
+        dummyCommandContext,
+        dummyTransactionContext,
+      ).rethrow()
 
       // then
       output.events shouldBe slot.captured.events
