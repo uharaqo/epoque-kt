@@ -34,27 +34,27 @@ abstract class CommandRouterFactoryBuilder<C : Any, S, E : Any> {
 
   /** [CC]: Concrete type of the command */
   inline fun <reified CC : C> commandHandlerFor(
-    noinline handle: suspend CommandHandlerRuntimeEnvironment<CC, S, E>.(c: CC, s: S) -> Unit,
+    noinline handle: suspend EpoqueRuntimeEnvironment<CC, S, E>.(c: CC, s: S) -> Unit,
   ) {
     commandHandlerFor(codecFactory.codecFor<CC>(), handle)
   }
 
   inline fun <reified CC : C, reified X> commandHandlerFor(
     noinline prepare: suspend (c: CC) -> X,
-    noinline handle: suspend CommandHandlerRuntimeEnvironment<CC, S, E>.(c: CC, s: S, x: X?) -> Unit,
+    noinline handle: suspend EpoqueRuntimeEnvironment<CC, S, E>.(c: CC, s: S, x: X?) -> Unit,
   ) {
     commandHandlerFor(codecFactory.codecFor<CC>(), prepare, handle)
   }
 
   abstract fun <CC : C> commandHandlerFor(
     codec: DataCodec<CC>,
-    handle: suspend CommandHandlerRuntimeEnvironment<CC, S, E>.(c: CC, s: S) -> Unit,
+    handle: suspend EpoqueRuntimeEnvironment<CC, S, E>.(c: CC, s: S) -> Unit,
   )
 
   abstract fun <CC : C, X> commandHandlerFor(
     codec: DataCodec<CC>,
     prepare: suspend (c: CC) -> X?,
-    handle: suspend CommandHandlerRuntimeEnvironment<CC, S, E>.(c: CC, s: S, x: X?) -> Unit,
+    handle: suspend EpoqueRuntimeEnvironment<CC, S, E>.(c: CC, s: S, x: X?) -> Unit,
   )
 
   abstract fun build(): CommandRouterFactory

@@ -12,12 +12,12 @@ import io.github.uharaqo.epoque.api.DataCodec
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_NOT_SUPPORTED
 import io.github.uharaqo.epoque.api.Journal
-import io.github.uharaqo.epoque.builder.CommandHandlerRuntimeEnvironment
 import io.github.uharaqo.epoque.builder.CommandProcessorFactory
 import io.github.uharaqo.epoque.builder.CommandRouterFactory
 import io.github.uharaqo.epoque.builder.CommandRouterFactoryBuilder
 import io.github.uharaqo.epoque.builder.DataCodecFactory
 import io.github.uharaqo.epoque.builder.DefaultRegistry
+import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironment
 import io.github.uharaqo.epoque.builder.RegistryBuilder
 import io.github.uharaqo.epoque.builder.toCommandCodec
 
@@ -46,24 +46,24 @@ private class DefaultCommandRouter(
 ) : CommandRouter
 
 private class DefaultCommandHandler<C, S, E>(
-  private val impl: suspend CommandHandlerRuntimeEnvironment<C, S, E>.(C, S) -> Unit,
+  private val impl: suspend EpoqueRuntimeEnvironment<C, S, E>.(C, S) -> Unit,
 ) : CommandHandler<C, S, E> {
   override suspend fun handle(c: C, s: S): CommandHandlerOutput<E> =
     @Suppress("UNCHECKED_CAST")
-    (CommandHandlerRuntimeEnvironment.get()!! as CommandHandlerRuntimeEnvironment<C, S, E>)
+    (EpoqueRuntimeEnvironment.get()!! as EpoqueRuntimeEnvironment<C, S, E>)
       .apply { impl(c, s) }
       .complete()
 }
 
 class DefaultPreparedCommandHandler<C, S, E, X>(
   override val prepare: suspend (c: C) -> X?,
-  private val impl: suspend CommandHandlerRuntimeEnvironment<C, S, E>.(C, S, X?) -> Unit,
+  private val impl: suspend EpoqueRuntimeEnvironment<C, S, E>.(C, S, X?) -> Unit,
 ) : PreparedCommandHandler<C, S, E> {
   override suspend fun handle(c: C, s: S): CommandHandlerOutput<E> =
     @Suppress("UNCHECKED_CAST")
-    CommandHandlerRuntimeEnvironment.get()!!.let { workflow ->
+    EpoqueRuntimeEnvironment.get()!!.let { workflow ->
       val x = workflow.preparedParam as X?
-      (workflow as CommandHandlerRuntimeEnvironment<C, S, E>).apply { impl(c, s, x) }.complete()
+      (workflow as EpoqueRuntimeEnvironment<C, S, E>).apply { impl(c, s, x) }.complete()
     }
 }
 
@@ -75,7 +75,7 @@ class DefaultCommandRouterFactoryBuilder<C : Any, S, E : Any>(
 
   override fun <CC : C> commandHandlerFor(
     codec: DataCodec<CC>,
-    handle: suspend CommandHandlerRuntimeEnvironment<CC, S, E>.(c: CC, s: S) -> Unit,
+    handle: suspend EpoqueRuntimeEnvironment<CC, S, E>.(c: CC, s: S) -> Unit,
   ) {
     val commandHandler = DefaultCommandHandler(handle)
 
@@ -86,7 +86,7 @@ class DefaultCommandRouterFactoryBuilder<C : Any, S, E : Any>(
   override fun <CC : C, X> commandHandlerFor(
     codec: DataCodec<CC>,
     prepare: suspend (c: CC) -> X?,
-    handle: suspend CommandHandlerRuntimeEnvironment<CC, S, E>.(c: CC, s: S, x: X?) -> Unit,
+    handle: suspend EpoqueRuntimeEnvironment<CC, S, E>.(c: CC, s: S, x: X?) -> Unit,
   ) {
     val commandHandler = DefaultPreparedCommandHandler(prepare, handle)
 

@@ -268,7 +268,7 @@ abstract class TestEnvironment {
     dummyTransactionStarter,
     CommandExecutorOptions(),
     dummyCallbackHandler,
-    DefaultCommandHandlerRuntimeEnvironmentFactoryFactory(),
+    DefaultEpoqueRuntimeEnvironmentFactoryFactory(),
   )
 
   @Suppress("UNCHECKED_CAST")

@@ -21,10 +21,10 @@ import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.asOutputMetadata
 import io.github.uharaqo.epoque.builder.CommandHandlerOutputCollector
-import io.github.uharaqo.epoque.builder.CommandHandlerRuntimeEnvironment
-import io.github.uharaqo.epoque.builder.CommandHandlerRuntimeEnvironmentFactory
-import io.github.uharaqo.epoque.builder.CommandHandlerRuntimeEnvironmentFactoryFactory
 import io.github.uharaqo.epoque.builder.CommandHandlerSideEffectHandler
+import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironment
+import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactory
+import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactoryFactory
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
 
@@ -34,41 +34,39 @@ interface PreparedCommandHandler<C, S, E> : CommandHandler<C, S, E> {
 
 object DeserializedCommand : EpoqueContextKey<Any>
 
-class DefaultCommandHandlerRuntimeEnvironmentFactoryFactory :
-  CommandHandlerRuntimeEnvironmentFactoryFactory {
+class DefaultEpoqueRuntimeEnvironmentFactoryFactory : EpoqueRuntimeEnvironmentFactoryFactory {
 
   override fun create(
     commandRouter: CommandRouter,
     environment: EpoqueEnvironment,
-  ): CommandHandlerRuntimeEnvironmentFactory<Any, Any?, Any> {
-    return DefaultCommandHandlerRuntimeEnvironmentFactory(commandRouter, environment.eventReader)
-  }
+  ): EpoqueRuntimeEnvironmentFactory<Any, Any?, Any> =
+    DefaultEpoqueRuntimeEnvironmentFactory(commandRouter, environment.eventReader)
 }
 
-class DefaultCommandHandlerRuntimeEnvironmentFactory(
+class DefaultEpoqueRuntimeEnvironmentFactory(
   private val commandRouter: CommandRouter,
   private val journalChecker: JournalChecker,
-) : CommandHandlerRuntimeEnvironmentFactory<Any, Any?, Any>, CommandRouter by commandRouter {
+) : EpoqueRuntimeEnvironmentFactory<Any, Any?, Any>, CommandRouter by commandRouter {
 
-  override suspend fun create(): CommandHandlerRuntimeEnvironment<Any, Any?, Any> {
+  override suspend fun create(): EpoqueRuntimeEnvironment<Any, Any?, Any> {
     val outputCollector = DefaultCommandHandlerOutputCollector<Any>()
     val sideEffectHandler = DefaultCommandHandlerSideEffectHandler(journalChecker, commandRouter)
-    return DefaultCommandHandlerRuntimeEnvironment(outputCollector, sideEffectHandler)
+    return DefaultEpoqueRuntimeEnvironment(outputCollector, sideEffectHandler)
   }
 
   override suspend fun process(input: CommandInput): Failable<CommandOutput> {
     val workflow = create()
-    return EpoqueContext.with({ put(CommandHandlerRuntimeEnvironment, workflow) }) {
+    return EpoqueContext.with({ put(EpoqueRuntimeEnvironment, workflow) }) {
       commandRouter.process(input)
     }
   }
 }
 
-class DefaultCommandHandlerRuntimeEnvironment(
+class DefaultEpoqueRuntimeEnvironment(
   private val outputCollector: CommandHandlerOutputCollector<Any>,
   private val sideEffectHandler: CommandHandlerSideEffectHandler,
 ) :
-  CommandHandlerRuntimeEnvironment<Any, Any?, Any>,
+  EpoqueRuntimeEnvironment<Any, Any?, Any>,
   CommandHandlerOutputCollector<Any> by outputCollector,
   CommandHandlerSideEffectHandler by sideEffectHandler {
 

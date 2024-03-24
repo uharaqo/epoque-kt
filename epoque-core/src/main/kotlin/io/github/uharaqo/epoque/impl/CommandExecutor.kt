@@ -30,7 +30,7 @@ import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.TransactionStarter
 import io.github.uharaqo.epoque.api.asInputMetadata
 import io.github.uharaqo.epoque.api.getRemainingTimeMillis
-import io.github.uharaqo.epoque.builder.CommandHandlerRuntimeEnvironment
+import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironment
 import java.time.Instant
 import kotlinx.coroutines.TimeoutCancellationException
 
@@ -87,7 +87,7 @@ class CommandExecutor<C, S, E : Any>(
         receivedTime = Instant.now(),
       )
 
-    val cbh = callbackHandler + CommandHandlerRuntimeEnvironment.get()!!
+    val cbh = callbackHandler + EpoqueRuntimeEnvironment.get()!!
 
     return EpoqueContext.with(
       {

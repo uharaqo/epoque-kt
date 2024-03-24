@@ -22,7 +22,7 @@ class CommandRouterSpec : StringSpec(
             }
           }
           .create(dummyEnvironment)
-          .let { DefaultCommandHandlerRuntimeEnvironmentFactory(it, mockk()) }
+          .let { DefaultEpoqueRuntimeEnvironmentFactory(it, mockk()) }
 
       // when
       val input = CommandInput(

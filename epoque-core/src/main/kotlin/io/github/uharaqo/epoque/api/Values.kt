@@ -1,6 +1,6 @@
 package io.github.uharaqo.epoque.api
 
-import io.github.uharaqo.epoque.builder.CommandHandlerRuntimeEnvironmentFactoryFactory
+import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactoryFactory
 import java.time.Instant
 
 @JvmInline
@@ -92,7 +92,7 @@ data class EpoqueEnvironment(
   val transactionStarter: TransactionStarter,
   val defaultCommandExecutorOptions: CommandExecutorOptions?,
   val callbackHandler: CallbackHandler?,
-  val runtimeEnvironmentFactoryFactory: CommandHandlerRuntimeEnvironmentFactoryFactory,
+  val runtimeEnvironmentFactoryFactory: EpoqueRuntimeEnvironmentFactoryFactory,
 )
 
 interface Registry<K : Any, V : Any> {

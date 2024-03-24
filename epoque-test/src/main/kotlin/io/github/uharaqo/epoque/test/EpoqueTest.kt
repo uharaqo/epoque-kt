@@ -7,10 +7,11 @@ import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.EventStore
 import io.github.uharaqo.epoque.api.WriteOption.LOCK_JOURNAL
 import io.github.uharaqo.epoque.builder.CommandRouterFactory
+import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactoryFactory
 import io.github.uharaqo.epoque.db.jooq.JooqEventStore
 import io.github.uharaqo.epoque.db.jooq.TableDefinition
 import io.github.uharaqo.epoque.db.jooq.h2.H2JooqQueries
-import io.github.uharaqo.epoque.impl.DefaultCommandHandlerRuntimeEnvironmentFactoryFactory
+import io.github.uharaqo.epoque.impl.DefaultEpoqueRuntimeEnvironmentFactoryFactory
 import io.github.uharaqo.epoque.test.api.Tester
 import io.github.uharaqo.epoque.test.impl.DebugLogger
 import io.github.uharaqo.epoque.test.impl.DefaultTester
@@ -24,6 +25,9 @@ import org.jooq.conf.Settings
 import org.jooq.impl.DSL
 
 object EpoqueTest {
+  val runtimeEnvironmentFactoryFactory: EpoqueRuntimeEnvironmentFactoryFactory =
+    DefaultEpoqueRuntimeEnvironmentFactoryFactory()
+
   fun newH2JooqContext(): DSLContext =
     DriverManager.getConnection(
       "jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=TRUE",
@@ -55,7 +59,14 @@ object EpoqueTest {
     ),
     callbackHandler: CallbackHandler = DebugLogger(),
   ): EpoqueEnvironment =
-    EpoqueEnvironment(eventStore, eventStore, eventStore, options, callbackHandler, DefaultCommandHandlerRuntimeEnvironmentFactoryFactory())
+    EpoqueEnvironment(
+      eventReader = eventStore,
+      eventWriter = eventStore,
+      transactionStarter = eventStore,
+      defaultCommandExecutorOptions = options,
+      callbackHandler = callbackHandler,
+      runtimeEnvironmentFactoryFactory = runtimeEnvironmentFactoryFactory,
+    )
 
   fun newTester(
     environment: EpoqueEnvironment,

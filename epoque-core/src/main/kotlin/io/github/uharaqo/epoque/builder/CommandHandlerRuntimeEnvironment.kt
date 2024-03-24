@@ -14,25 +14,25 @@ import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
 
 /** build time */
-interface CommandHandlerRuntimeEnvironmentFactoryFactory {
+interface EpoqueRuntimeEnvironmentFactoryFactory {
   fun create(
     commandRouter: CommandRouter,
     environment: EpoqueEnvironment,
-  ): CommandHandlerRuntimeEnvironmentFactory<Any, Any?, Any>
+  ): EpoqueRuntimeEnvironmentFactory<Any, Any?, Any>
 }
 
 /** routing time */
-interface CommandHandlerRuntimeEnvironmentFactory<C, S, E> : CommandProcessor, CommandRouter {
-  suspend fun create(): CommandHandlerRuntimeEnvironment<C, S, E>
+interface EpoqueRuntimeEnvironmentFactory<C, S, E> : CommandProcessor, CommandRouter {
+  suspend fun create(): EpoqueRuntimeEnvironment<C, S, E>
 }
 
 /** execution time */
-interface CommandHandlerRuntimeEnvironment<C, S, E> :
+interface EpoqueRuntimeEnvironment<C, S, E> :
   CommandHandlerOutputCollector<E>, CommandHandlerSideEffectHandler, CallbackHandler {
 
   val preparedParam: Any?
 
-  companion object : EpoqueContextKey<CommandHandlerRuntimeEnvironment<*, *, *>>
+  companion object : EpoqueContextKey<EpoqueRuntimeEnvironment<*, *, *>>
 }
 
 interface CommandHandlerOutputCollector<E> {

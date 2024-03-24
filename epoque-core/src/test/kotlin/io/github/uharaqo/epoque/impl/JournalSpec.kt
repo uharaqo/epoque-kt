@@ -49,7 +49,7 @@ class JournalSpec : StringSpec(
             }
           }
           .create(environment)
-          .let { DefaultCommandHandlerRuntimeEnvironmentFactory(it, mockk()) }
+          .let { DefaultEpoqueRuntimeEnvironmentFactory(it, mockk()) }
 
       // when
       val command = TestCommand.Create("Integration")
