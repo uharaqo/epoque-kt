@@ -32,28 +32,27 @@ import io.github.uharaqo.epoque.api.TransactionStarter
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
 import io.github.uharaqo.epoque.api.WriteOption
-import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactoryFactory
 import io.github.uharaqo.epoque.builder.EventCodecRegistryBuilder
 import io.github.uharaqo.epoque.builder.RegistryBuilder
-import io.github.uharaqo.epoque.builder.toCommandCodec
-import io.github.uharaqo.epoque.serialization.JsonCodec
-import io.github.uharaqo.epoque.serialization.JsonCodecFactory
-import io.github.uharaqo.epoque.serialization.SerializedJson
+import io.github.uharaqo.epoque.codec.JsonCodec
+import io.github.uharaqo.epoque.codec.KotlinxJsonCodecFactory
+import io.github.uharaqo.epoque.codec.SerializedJson
+import io.github.uharaqo.epoque.impl2.forEvent
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
-import java.time.Instant
 
 abstract class TestEnvironment {
-  val jsonCodecFactory = JsonCodecFactory()
+  val jsonCodecFactory = KotlinxJsonCodecFactory()
 
-  val epoqueBuilder = Epoque.journalFor<TestEvent>(jsonCodecFactory)
+  val epoqueBuilder = Epoque.forEvent<TestEvent>(jsonCodecFactory)
 
-  val TEST_JOURNAL = epoqueBuilder.summaryFor<TestSummary>(TestSummary.Empty) {
+  val TEST_JOURNAL = epoqueBuilder.forSummary<TestSummary>(TestSummary.Empty) {
     eventHandlerFor<TestEvent.ResourceCreated> { s, e ->
       if (s is TestSummary.Default) {
         TestSummary.Default(s.list + e)
@@ -63,7 +62,7 @@ abstract class TestEnvironment {
     }
   }
 
-  val TEST_COMMANDS = epoqueBuilder.with(TEST_JOURNAL).routerFor<TestCommand> {
+  val TEST_COMMANDS = epoqueBuilder.with(TEST_JOURNAL).forCommand<TestCommand> {
     commandHandlerFor<TestCommand.Create> { c, s ->
       emit(dummyEvents)
     }
@@ -269,7 +268,6 @@ abstract class TestEnvironment {
     dummyTransactionStarter,
     CommandExecutorOptions(),
     dummyCallbackHandler,
-    EpoqueRuntimeEnvironmentFactoryFactory.create(),
   )
 
   @Suppress("UNCHECKED_CAST")
@@ -280,13 +278,13 @@ abstract class TestEnvironment {
       dummyJournalKey.groupId,
       dummyCommandDecoder,
       dummyCommandHandler,
+      dummyEnvironment.callbackHandler ?: CallbackHandler.EMPTY,
       dummyEventCodecRegistry,
       dummyEventHandlerExecutor,
       dummyEnvironment.eventReader,
       eventWriter ?: dummyEnvironment.eventWriter,
       dummyEnvironment.transactionStarter,
       dummyEnvironment.defaultCommandExecutorOptions,
-      dummyEnvironment.callbackHandler ?: CallbackHandler.EMPTY,
     )
   }
 }

@@ -21,8 +21,10 @@ class EpoqueException(cause: Cause, details: String? = null, t: Throwable? = nul
     COMMAND_PREPARATION_FAILURE,
     COMMAND_HANDLER_FAILURE,
     COMMAND_REJECTED,
-    TIMEOUT_EXCEPTION,
-    UNKNOWN_EXCEPTION,
+    TIMEOUT,
+
+    /** An error that should not happen */
+    UNEXPECTED_ERROR,
     ;
 
     fun toException(t: Throwable? = null): EpoqueException = toException(t, null)

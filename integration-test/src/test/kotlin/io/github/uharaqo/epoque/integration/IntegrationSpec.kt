@@ -1,5 +1,6 @@
 package io.github.uharaqo.epoque.integration
 
+import io.github.uharaqo.epoque.Epoque
 import io.github.uharaqo.epoque.api.EpoqueException
 import io.github.uharaqo.epoque.builder.ProjectionRegistry
 import io.github.uharaqo.epoque.integration.TestEnvironment.RequestId
@@ -21,6 +22,8 @@ import io.github.uharaqo.epoque.integration.epoque.task.TaskEnded
 import io.github.uharaqo.epoque.integration.epoque.task.TaskStarted
 import io.github.uharaqo.epoque.test.EpoqueTest
 import io.github.uharaqo.epoque.test.impl.DebugLogger
+import io.github.uharaqo.epoque.test.impl.newH2JooqContext
+import io.github.uharaqo.epoque.test.impl.newTestEnvironment
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -32,11 +35,11 @@ class IntegrationSpec : StringSpec(
     val startedAt = 123L
     val endedAt = 456L
 
-    initTables(EpoqueTest.newH2JooqContext())
+    initTables(Epoque.newH2JooqContext())
 
     val callbackHandler = DebugLogger() +
       ProjectionRegistry.from(listOf(PROJECT_PROJECTIONS, TASK_PROJECTIONS)).toCallbackHandler()
-    val environment = EpoqueTest.newEnvironment(callbackHandler = callbackHandler)
+    val environment = Epoque.newTestEnvironment(callbackHandler = callbackHandler)
     val tester = EpoqueTest.newTester(environment, PROJECT_COMMANDS, TASK_COMMANDS)
 
     val meta = mutableMapOf("RequestId" to RequestId("123"))
@@ -49,10 +52,10 @@ My First Task,My First Task,Project1
       tester.forJournal(PROJECT_JOURNAL) {
         command(projectId1, CreateProject(project1), meta) {
           events shouldBe listOf(ProjectCreated(project1))
-          summary shouldBe Project.Default
+          summary shouldBe Project
         }
       }
-      EpoqueTest.newH2JooqContext().apply {
+      Epoque.newH2JooqContext().apply {
         selectFrom(table("task")).fetch().formatCSV(false) shouldBe "Foo,TaskX,\"\"\n"
       }
     }
@@ -71,7 +74,7 @@ My First Task,My First Task,Project1
           summary shouldBe Task.Default(false)
         }
       }
-      EpoqueTest.newH2JooqContext().apply {
+      Epoque.newH2JooqContext().apply {
         selectFrom(table("task")).fetch().formatCSV(false) shouldBe expectedTaskRecords
       }
     }
@@ -82,7 +85,7 @@ My First Task,My First Task,Project1
           summary shouldBe Task.Default(true)
         }
       }
-      EpoqueTest.newH2JooqContext().apply {
+      Epoque.newH2JooqContext().apply {
         selectFrom(table("task")).fetch().formatCSV(false) shouldBe expectedTaskRecords
       }
     }
@@ -93,7 +96,7 @@ My First Task,My First Task,Project1
           summary shouldBe Task.Default(true)
         }
       }
-      EpoqueTest.newH2JooqContext().apply {
+      Epoque.newH2JooqContext().apply {
         selectFrom(table("task")).fetch().formatCSV(false) shouldBe expectedTaskRecords
       }
     }
@@ -104,7 +107,7 @@ My First Task,My First Task,Project1
           summary shouldBe Task.Default(false)
         }
       }
-      EpoqueTest.newH2JooqContext().apply {
+      Epoque.newH2JooqContext().apply {
         selectFrom(table("task")).fetch().formatCSV(false) shouldBe expectedTaskRecords
       }
     }
@@ -115,18 +118,18 @@ My First Task,My First Task,Project1
           summary shouldBe Task.Default(false)
         }
       }
-      EpoqueTest.newH2JooqContext().apply {
+      Epoque.newH2JooqContext().apply {
         selectFrom(table("task")).fetch().formatCSV(false) shouldBe expectedTaskRecords
       }
     }
 
     "Projection Result" {
       fun Map<String, Any?>.fixKeys() = mapKeys { (k, _) -> k.uppercase() }
-      EpoqueTest.newH2JooqContext().apply {
+      Epoque.newH2JooqContext().apply {
         println(selectFrom(table("task")).fetch())
       }
 
-      EpoqueTest.newH2JooqContext().apply {
+      Epoque.newH2JooqContext().apply {
         selectFrom(table("project")).fetch().intoMaps() shouldBe listOf(
           mapOf("id" to project1, "name" to project1).fixKeys(),
         )
@@ -146,6 +149,5 @@ My First Task,My First Task,Project1
     }
   },
 ) {
-  companion object : TestEnvironment() {
-  }
+  companion object : TestEnvironment()
 }

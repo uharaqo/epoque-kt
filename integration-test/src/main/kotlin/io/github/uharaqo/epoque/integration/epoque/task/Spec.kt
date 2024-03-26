@@ -1,8 +1,9 @@
 package io.github.uharaqo.epoque.integration.epoque.task
 
 import io.github.uharaqo.epoque.Epoque
+import io.github.uharaqo.epoque.codec.KotlinxJsonCodecFactory
+import io.github.uharaqo.epoque.impl2.forEvent
 import io.github.uharaqo.epoque.integration.epoque.project.PROJECT_JOURNAL
-import io.github.uharaqo.epoque.serialization.JsonCodecFactory
 
 // summary with multiple subtypes
 sealed interface Task {
@@ -10,9 +11,9 @@ sealed interface Task {
   data class Default(val started: Boolean) : Task
 }
 
-private val builder = Epoque.journalFor<TaskEvent>(JsonCodecFactory())
+private val builder = Epoque.forEvent<TaskEvent>(KotlinxJsonCodecFactory())
 
-val TASK_JOURNAL = builder.summaryFor<Task>(Task.Empty) {
+val TASK_JOURNAL = builder.forSummary<Task>(Task.Empty) {
   eventHandlerFor<TaskCreated> { s, e ->
     check(s is Task.Empty) { "Already created" }
     Task.Default(false)
@@ -27,7 +28,7 @@ val TASK_JOURNAL = builder.summaryFor<Task>(Task.Empty) {
   }
 }
 
-val TASK_COMMANDS = builder.with(TASK_JOURNAL).routerFor<TaskCommand> {
+val TASK_COMMANDS = builder.with(TASK_JOURNAL).forCommand<TaskCommand> {
   commandHandlerFor<CreateTask> { c, s ->
     if (s !is Task.Empty) reject("Already created")
     if (c.project != null && !exists(PROJECT_JOURNAL, c.project)) reject("Project Not Found")

@@ -1,4 +1,4 @@
-package io.github.uharaqo.epoque.impl
+package io.github.uharaqo.epoque.impl2
 
 import arrow.core.flatMap
 import arrow.core.getOrElse
@@ -12,7 +12,6 @@ import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.CommandRouter
 import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.EpoqueContext
-import io.github.uharaqo.epoque.api.EpoqueContextKey
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.EpoqueException
 import io.github.uharaqo.epoque.api.Failable
@@ -27,14 +26,13 @@ import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironment
 import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactory
 import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactoryFactory
 import io.github.uharaqo.epoque.builder.WithPreparedParam
+import io.github.uharaqo.epoque.impl.DeserializedCommand
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
 
 interface PreparedCommandHandler<C, S, E> : CommandHandler<C, S, E> {
   val prepare: suspend (c: C) -> Any?
 }
-
-object DeserializedCommand : EpoqueContextKey<Any>
 
 class DefaultEpoqueRuntimeEnvironmentFactoryFactory : EpoqueRuntimeEnvironmentFactoryFactory {
 

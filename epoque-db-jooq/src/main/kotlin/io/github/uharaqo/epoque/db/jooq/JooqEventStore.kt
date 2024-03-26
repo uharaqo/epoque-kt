@@ -107,7 +107,7 @@ class JooqEventStore<D>(
     when (writeOption) {
       WriteOption.DEFAULT -> startDefaultTransaction(block)
 
-      WriteOption.LOCK_JOURNAL -> Either.catch {
+      WriteOption.JOURNAL_LOCK -> Either.catch {
         val prevTx = getTransactionContext()
         val locked = prevTx?.asJooq { lockedKeys } ?: emptySet()
         if (key in locked) return@catch block(prevTx!!)

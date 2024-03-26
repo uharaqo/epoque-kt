@@ -16,7 +16,7 @@ enum class WriteOption {
 
   /** Ensures that only a single command handler can be processed at a time by reserving event
    * writes for a [JournalKey] */
-  LOCK_JOURNAL,
+  JOURNAL_LOCK,
 }
 
 fun interface EventWriter {

@@ -4,7 +4,7 @@ import arrow.core.getOrElse
 import io.github.uharaqo.epoque.api.CallbackHandler
 import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_PROJECTION_FAILURE
-import io.github.uharaqo.epoque.api.EpoqueException.Cause.UNKNOWN_EXCEPTION
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.UNEXPECTED_ERROR
 import io.github.uharaqo.epoque.api.EventType
 import io.github.uharaqo.epoque.api.Projection
 import io.github.uharaqo.epoque.api.ProjectionEvent
@@ -31,11 +31,11 @@ class TransactionalProjectionExecutor(
 ) : CallbackHandler {
   override suspend fun beforeCommit(output: CommandOutput) {
     val tx = TransactionContext.get()
-      ?: throw UNKNOWN_EXCEPTION.toException(message = "Transaction not found")
+      ?: throw UNEXPECTED_ERROR.toException(message = "Transaction not found")
 
     output.events.forEach { ve ->
       val processor = projectionRegistry[ve.type] ?: return@forEach
-      val event = processor.eventCodec.decoder.decode(ve.event).getOrElse { throw it }
+      val event = processor.eventCodec.decode(ve.event).getOrElse { throw it }
       val projectionEvent = ProjectionEvent(output.context.key, ve.version, event)
 
       try {

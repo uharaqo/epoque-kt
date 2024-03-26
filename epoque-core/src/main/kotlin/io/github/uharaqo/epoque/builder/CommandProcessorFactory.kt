@@ -4,10 +4,12 @@ import io.github.uharaqo.epoque.api.CommandHandler
 import io.github.uharaqo.epoque.api.CommandProcessor
 import io.github.uharaqo.epoque.api.CommandRouter
 import io.github.uharaqo.epoque.api.DataCodec
+import io.github.uharaqo.epoque.api.DataCodecFactory
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.Journal
-import io.github.uharaqo.epoque.impl.DefaultCommandRouterFactoryBuilder
-import io.github.uharaqo.epoque.impl.fromFactories
+import io.github.uharaqo.epoque.api.codecFor
+import io.github.uharaqo.epoque.impl2.DefaultCommandRouterFactoryBuilder
+import io.github.uharaqo.epoque.impl2.fromFactories
 
 fun List<CommandRouterFactory>.toRouter(environment: EpoqueEnvironment): CommandRouter =
   CommandRouter.fromFactories(environment, this)

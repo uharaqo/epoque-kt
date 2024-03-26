@@ -1,10 +1,12 @@
 package io.github.uharaqo.epoque.builder
 
 import io.github.uharaqo.epoque.api.DataCodec
+import io.github.uharaqo.epoque.api.DataCodecFactory
 import io.github.uharaqo.epoque.api.EventHandler
 import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalGroupId
-import io.github.uharaqo.epoque.impl.DefaultJournalBuilder
+import io.github.uharaqo.epoque.api.codecFor
+import io.github.uharaqo.epoque.impl2.DefaultJournalBuilder
 
 abstract class JournalBuilder<S, E : Any> {
   abstract val codecFactory: DataCodecFactory

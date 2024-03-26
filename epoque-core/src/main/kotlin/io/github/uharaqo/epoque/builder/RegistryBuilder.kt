@@ -1,10 +1,8 @@
 package io.github.uharaqo.epoque.builder
 
-import arrow.core.left
-import arrow.core.right
 import io.github.uharaqo.epoque.api.EpoqueException
-import io.github.uharaqo.epoque.api.Failable
 import io.github.uharaqo.epoque.api.Registry
+import io.github.uharaqo.epoque.impl.DefaultRegistry
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -33,16 +31,4 @@ class RegistryBuilder<K : Any, V : Any>(
       it.putAll(buildIntoMap())
       it.putAll(other.buildIntoMap())
     }.let(::RegistryBuilder)
-}
-
-class DefaultRegistry<K : Any, V : Any>(
-  map: Map<K, V>,
-  private val onError: (K) -> EpoqueException,
-) : Registry<K, V> {
-  private val map = Collections.unmodifiableMap(map)
-
-  override fun find(key: K): Failable<V> = (map[key]?.right()) ?: (onError(key).left())
-
-  fun toBuilder() = RegistryBuilder<K, V>(map)
-  override fun toMap(): Map<K, V> = map
 }

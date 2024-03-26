@@ -12,7 +12,7 @@ import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_REJECTED
 import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
-import io.github.uharaqo.epoque.impl.DefaultEpoqueRuntimeEnvironmentFactoryFactory
+import io.github.uharaqo.epoque.impl2.DefaultEpoqueRuntimeEnvironmentFactoryFactory
 
 /** build time */
 interface EpoqueRuntimeEnvironmentFactoryFactory {

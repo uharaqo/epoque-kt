@@ -39,30 +39,31 @@ class EpoqueContext private constructor(
       DefaultBuilder(getOrCreate()).apply(block).build()
 
     suspend fun <T> with(configure: Builder.() -> Unit, block: suspend CoroutineScope.() -> T): T =
+      // TODO: withContext only when anything has changed
       with(configure).withContext(block)
   }
 
   interface Builder {
-    fun <V> put(key: EpoqueContextKey<V>, value: V)
-    suspend fun <V> map(key: EpoqueContextKey<V>, f: suspend (V?) -> V)
+    fun <V> put(key: EpoqueContextKey<V>, value: V): Builder
+    suspend fun <V> map(key: EpoqueContextKey<V>, f: suspend (V?) -> V): Builder
   }
 
-  private class DefaultBuilder(private val original: EpoqueContext?) : Builder {
-    private val map = mutableMapOf<EpoqueContextKey<*>, Any?>()
+  private class DefaultBuilder(private val original: EpoqueContext) : Builder {
+    private val map = original.map.toMutableMap()
+    private var changed = false
 
-    override fun <V> put(key: EpoqueContextKey<V>, value: V) {
+    override fun <V> put(key: EpoqueContextKey<V>, value: V) = this.also {
       map += (key to value as Any?)
+      changed = true
     }
 
-    override suspend fun <V> map(key: EpoqueContextKey<V>, f: suspend (V?) -> V) {
+    override suspend fun <V> map(key: EpoqueContextKey<V>, f: suspend (V?) -> V) = this.also {
       @Suppress("UNCHECKED_CAST")
       map[key] = f(map[key] as V?)
+      changed = true
     }
 
-    fun build(): EpoqueContext =
-      original
-        ?.let { if (map.isNotEmpty()) EpoqueContext(it.map + map) else it }
-        ?: EpoqueContext(map)
+    fun build(): EpoqueContext = if (changed) EpoqueContext(map) else original
   }
 }
 

@@ -1,4 +1,4 @@
-package io.github.uharaqo.epoque.impl
+package io.github.uharaqo.epoque.impl2
 
 import io.github.uharaqo.epoque.api.CommandCodec
 import io.github.uharaqo.epoque.api.CommandCodecRegistry
@@ -9,18 +9,19 @@ import io.github.uharaqo.epoque.api.CommandProcessorRegistry
 import io.github.uharaqo.epoque.api.CommandRouter
 import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.DataCodec
+import io.github.uharaqo.epoque.api.DataCodecFactory
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_NOT_SUPPORTED
 import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.builder.CommandProcessorFactory
 import io.github.uharaqo.epoque.builder.CommandRouterFactory
 import io.github.uharaqo.epoque.builder.CommandRouterFactoryBuilder
-import io.github.uharaqo.epoque.builder.DataCodecFactory
-import io.github.uharaqo.epoque.builder.DefaultRegistry
 import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironment
+import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactoryFactory
 import io.github.uharaqo.epoque.builder.RegistryBuilder
 import io.github.uharaqo.epoque.builder.WithPreparedParam
-import io.github.uharaqo.epoque.builder.toCommandCodec
+import io.github.uharaqo.epoque.impl.DefaultRegistry
+import io.github.uharaqo.epoque.impl.toCommandCodec
 
 fun CommandRouter.Companion.fromFactories(
   environment: EpoqueEnvironment,
@@ -38,13 +39,8 @@ fun CommandRouter.Companion.fromFactories(
     CommandCodecRegistry(DefaultRegistry(codecs, onError)),
     CommandProcessorRegistry(DefaultRegistry(processors, onError)),
   )
-  return environment.runtimeEnvironmentFactoryFactory.create(defaultCommandRouter, environment)
+  return EpoqueRuntimeEnvironmentFactoryFactory.create().create(defaultCommandRouter, environment)
 }
-
-private class DefaultCommandRouter(
-  override val commandCodecRegistry: CommandCodecRegistry,
-  override val commandProcessorRegistry: CommandProcessorRegistry,
-) : CommandRouter
 
 private class DefaultCommandHandler<C, S, E>(
   private val impl: suspend EpoqueRuntimeEnvironment<C, S, E>.(C, S) -> Unit,

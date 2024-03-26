@@ -1,18 +1,18 @@
-package io.github.uharaqo.epoque.impl
+package io.github.uharaqo.epoque.impl2
 
 import io.github.uharaqo.epoque.api.DataCodec
+import io.github.uharaqo.epoque.api.DataCodecFactory
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_NOT_SUPPORTED
 import io.github.uharaqo.epoque.api.EventHandler
 import io.github.uharaqo.epoque.api.EventHandlerRegistry
 import io.github.uharaqo.epoque.api.EventType
 import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalGroupId
-import io.github.uharaqo.epoque.builder.DataCodecFactory
 import io.github.uharaqo.epoque.builder.EventCodecRegistryBuilder
 import io.github.uharaqo.epoque.builder.JournalBuilder
 import io.github.uharaqo.epoque.builder.RegistryBuilder
 
-internal class DefaultJournalBuilder<S, E : Any>(
+class DefaultJournalBuilder<S, E : Any>(
   val journalGroupId: JournalGroupId,
   val emptySummary: S,
   override val codecFactory: DataCodecFactory,
@@ -37,7 +37,7 @@ internal class DefaultJournalBuilder<S, E : Any>(
     )
 }
 
-private class EventHandlerRegistryBuilder<S, E : Any> {
+class EventHandlerRegistryBuilder<S, E : Any> {
   private val registry = RegistryBuilder<EventType, EventHandler<S, E>>()
 
   /** [CE]: Concrete type of the event */
