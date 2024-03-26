@@ -1,6 +1,7 @@
 package io.github.uharaqo.epoque.db.jooq
 
 import arrow.core.getOrElse
+import io.github.uharaqo.epoque.Epoque
 import io.github.uharaqo.epoque.api.EventCodec
 import io.github.uharaqo.epoque.api.EventType
 import io.github.uharaqo.epoque.api.Journal
@@ -9,6 +10,12 @@ import io.github.uharaqo.epoque.api.ProjectionEvent
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.builder.ProjectionRegistry
 import io.github.uharaqo.epoque.builder.RegistryBuilder
+
+fun <S, E : Any> Epoque.projectionFor(
+  journal: Journal<S, E>,
+  block: JooqProjectionBuilder<S, E>.() -> Unit,
+): ProjectionRegistry =
+  JooqProjectionBuilder(journal).apply(block).build()
 
 fun interface JooqProjection<E> {
   suspend fun JooqTransactionContext.process(event: ProjectionEvent<E>)

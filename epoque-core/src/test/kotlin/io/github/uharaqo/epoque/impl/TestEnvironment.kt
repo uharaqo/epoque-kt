@@ -32,7 +32,6 @@ import io.github.uharaqo.epoque.api.TransactionStarter
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
 import io.github.uharaqo.epoque.api.WriteOption
-import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactoryFactory
 import io.github.uharaqo.epoque.builder.RegistryBuilder
 import io.github.uharaqo.epoque.codec.JsonCodec
 import io.github.uharaqo.epoque.codec.JsonCodecFactory
@@ -268,7 +267,6 @@ abstract class TestEnvironment {
     dummyTransactionStarter,
     CommandExecutorOptions(),
     dummyCallbackHandler,
-    EpoqueRuntimeEnvironmentFactoryFactory.create(),
   )
 
   @Suppress("UNCHECKED_CAST")

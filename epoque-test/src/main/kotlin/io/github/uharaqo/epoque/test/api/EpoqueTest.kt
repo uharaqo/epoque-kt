@@ -4,6 +4,7 @@ import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalId
 
 interface Tester {
+  fun <S, E : Any> forJournal(journal: Journal<S, E>): CommandTester<S, E>
   fun <S, E : Any> forJournal(journal: Journal<S, E>, block: (CommandTester<S, E>.() -> Unit))
 }
 

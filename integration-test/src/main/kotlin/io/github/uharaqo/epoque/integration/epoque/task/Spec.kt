@@ -2,6 +2,7 @@ package io.github.uharaqo.epoque.integration.epoque.task
 
 import io.github.uharaqo.epoque.Epoque
 import io.github.uharaqo.epoque.codec.JsonCodecFactory
+import io.github.uharaqo.epoque.impl.journalFor
 import io.github.uharaqo.epoque.integration.epoque.project.PROJECT_JOURNAL
 
 // summary with multiple subtypes
