@@ -14,6 +14,7 @@ import io.github.uharaqo.epoque.db.jooq.h2.H2JooqQueries
 import io.github.uharaqo.epoque.test.api.Tester
 import io.github.uharaqo.epoque.test.impl.DebugLogger
 import io.github.uharaqo.epoque.test.impl.DefaultTester
+import java.sql.DriverManager
 import org.jooq.DSLContext
 import org.jooq.JSONB
 import org.jooq.SQLDialect
@@ -21,7 +22,6 @@ import org.jooq.conf.RenderNameCase
 import org.jooq.conf.RenderQuotedNames
 import org.jooq.conf.Settings
 import org.jooq.impl.DSL
-import java.sql.DriverManager
 
 object EpoqueTest {
   val runtimeEnvironmentFactoryFactory: EpoqueRuntimeEnvironmentFactoryFactory =

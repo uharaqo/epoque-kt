@@ -1,12 +1,12 @@
 package io.github.uharaqo.epoque
 
 import io.github.uharaqo.epoque.api.CommandRouter
+import io.github.uharaqo.epoque.api.DataCodecFactory
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.builder.CommandRouterFactory
 import io.github.uharaqo.epoque.builder.CommandRouterFactoryBuilder
-import io.github.uharaqo.epoque.builder.DataCodecFactory
 import io.github.uharaqo.epoque.builder.JournalBuilder
 import io.github.uharaqo.epoque.builder.toRouter
 

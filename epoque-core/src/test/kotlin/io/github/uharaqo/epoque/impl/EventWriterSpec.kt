@@ -9,7 +9,6 @@ import io.github.uharaqo.epoque.api.EventWriter
 import io.github.uharaqo.epoque.api.SerializedEvent
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.Version
-import io.github.uharaqo.epoque.builder.EventCodecRegistryBuilder
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestEvent
 import io.github.uharaqo.epoque.impl.TestEnvironment.TestEvent.ResourceCreated
 import io.kotest.assertions.arrow.core.rethrow

@@ -17,13 +17,19 @@ interface DataDecoder<out V> {
 
 interface DataCodec<V> : DataEncoder<V>, DataDecoder<V>
 
+interface DataCodecFactory {
+  fun <V : Any> create(type: Class<V>): DataCodec<V>
+}
+
+inline fun <reified V : Any> DataCodecFactory.codecFor() = create(V::class.java)
+
 @JvmInline
 value class SerializedEvent(val unwrap: SerializedData) {
   override fun toString(): String = unwrap.toString()
 }
 
 @JvmInline
-value class EventType private constructor(private val unwrap: Class<*>) {
+value class EventType private constructor(val unwrap: Class<*>) {
   override fun toString(): String = unwrap.canonicalName!!
 
   companion object {
@@ -61,7 +67,7 @@ value class SerializedCommand(val unwrap: SerializedData) {
 }
 
 @JvmInline
-value class CommandType private constructor(private val unwrap: Class<*>) {
+value class CommandType private constructor(val unwrap: Class<*>) {
   override fun toString(): String = unwrap.canonicalName!!
 
   companion object {

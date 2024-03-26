@@ -1,14 +1,13 @@
 package io.github.uharaqo.epoque.impl
 
 import io.github.uharaqo.epoque.api.DataCodec
+import io.github.uharaqo.epoque.api.DataCodecFactory
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_NOT_SUPPORTED
 import io.github.uharaqo.epoque.api.EventHandler
 import io.github.uharaqo.epoque.api.EventHandlerRegistry
 import io.github.uharaqo.epoque.api.EventType
 import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalGroupId
-import io.github.uharaqo.epoque.builder.DataCodecFactory
-import io.github.uharaqo.epoque.builder.EventCodecRegistryBuilder
 import io.github.uharaqo.epoque.builder.JournalBuilder
 import io.github.uharaqo.epoque.builder.RegistryBuilder
 

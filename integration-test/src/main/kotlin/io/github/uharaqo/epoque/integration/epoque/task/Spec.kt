@@ -1,8 +1,8 @@
 package io.github.uharaqo.epoque.integration.epoque.task
 
 import io.github.uharaqo.epoque.Epoque
+import io.github.uharaqo.epoque.codec.JsonCodecFactory
 import io.github.uharaqo.epoque.integration.epoque.project.PROJECT_JOURNAL
-import io.github.uharaqo.epoque.serialization.JsonCodecFactory
 
 // summary with multiple subtypes
 sealed interface Task {

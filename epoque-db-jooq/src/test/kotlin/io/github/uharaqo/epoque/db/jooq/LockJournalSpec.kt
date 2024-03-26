@@ -17,8 +17,8 @@ import io.github.uharaqo.epoque.api.SerializedEvent
 import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
 import io.github.uharaqo.epoque.api.WriteOption
+import io.github.uharaqo.epoque.codec.SerializedJson
 import io.github.uharaqo.epoque.db.jooq.JooqUtil.toEventStore
-import io.github.uharaqo.epoque.serialization.SerializedJson
 import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.common.runBlocking

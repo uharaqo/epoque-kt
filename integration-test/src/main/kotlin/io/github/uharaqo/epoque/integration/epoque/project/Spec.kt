@@ -1,8 +1,8 @@
 package io.github.uharaqo.epoque.integration.epoque.project
 
 import io.github.uharaqo.epoque.Epoque
+import io.github.uharaqo.epoque.codec.JsonCodecFactory
 import io.github.uharaqo.epoque.integration.epoque.task.CreateTask
-import io.github.uharaqo.epoque.serialization.JsonCodecFactory
 
 // simple summary without any sub types
 data object Project

@@ -49,7 +49,7 @@ My First Task,My First Task,Project1
       tester.forJournal(PROJECT_JOURNAL) {
         command(projectId1, CreateProject(project1), meta) {
           events shouldBe listOf(ProjectCreated(project1))
-          summary shouldBe Project.Default
+          summary shouldBe Project
         }
       }
       EpoqueTest.newH2JooqContext().apply {

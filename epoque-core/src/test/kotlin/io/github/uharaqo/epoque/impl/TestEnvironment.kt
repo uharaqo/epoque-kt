@@ -33,12 +33,11 @@ import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
 import io.github.uharaqo.epoque.api.WriteOption
 import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactoryFactory
-import io.github.uharaqo.epoque.builder.EventCodecRegistryBuilder
 import io.github.uharaqo.epoque.builder.RegistryBuilder
-import io.github.uharaqo.epoque.builder.toCommandCodec
-import io.github.uharaqo.epoque.serialization.JsonCodec
-import io.github.uharaqo.epoque.serialization.JsonCodecFactory
-import io.github.uharaqo.epoque.serialization.SerializedJson
+import io.github.uharaqo.epoque.codec.JsonCodec
+import io.github.uharaqo.epoque.codec.JsonCodecFactory
+import io.github.uharaqo.epoque.codec.SerializedJson
+import io.github.uharaqo.epoque.dsl.toCommandCodec
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
