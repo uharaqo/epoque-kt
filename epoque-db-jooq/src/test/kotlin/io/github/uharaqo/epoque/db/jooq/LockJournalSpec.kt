@@ -95,7 +95,7 @@ class LockJournalSpec : StringSpec(
 
             with(store1) {
               log.info("Taking a lock @ T1").also { list += "Job1 Locking" }
-              startTransactionAndLock(key1, WriteOption.LOCK_JOURNAL) { tx ->
+              startTransactionAndLock(key1, WriteOption.JOURNAL_LOCK) { tx ->
                 log.info("Took a lock. Sleeping @ T2").also { list += "Job1 Sleeping" }
                 delay(t3)
                 log.info("Writing @T4").also { list += "Job1 Writing" }
@@ -113,7 +113,7 @@ class LockJournalSpec : StringSpec(
             with(store2) {
               log.info("Taking a lock @ T3 <- blocked by the job1's lock for a while")
                 .also { list += "Job2 Locking" }
-              startTransactionAndLock(key1, WriteOption.LOCK_JOURNAL) { tx ->
+              startTransactionAndLock(key1, WriteOption.JOURNAL_LOCK) { tx ->
                 log.info("Writing @ T6 <- gets called once the job1 release the lock")
                   .also { list += "Job2 Writing" }
                 shouldThrow<EpoqueException> {

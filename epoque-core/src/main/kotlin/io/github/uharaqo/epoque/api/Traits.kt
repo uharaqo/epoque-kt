@@ -1,6 +1,6 @@
 package io.github.uharaqo.epoque.api
 
-import arrow.core.Either
+import arrow.core.raise.catch
 import arrow.core.raise.either
 import arrow.core.raise.ensure
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_HANDLER_FAILURE
@@ -9,7 +9,7 @@ import io.github.uharaqo.epoque.api.EpoqueException.Cause.SUMMARY_AGGREGATION_FA
 import kotlinx.coroutines.flow.toList
 
 /** Serialize events by using [EventHandlerRegistry]. */
-interface CanSerializeEvents<E : Any> {
+interface CanSerializeEvents<E> {
   val eventCodecRegistry: EventCodecRegistry
 
   fun serializeEvents(
@@ -24,7 +24,7 @@ interface CanSerializeEvents<E : Any> {
 
   fun serializeEvent(e: E, version: Version): Failable<VersionedEvent> =
     either {
-      val eventType = EventType.of(e::class.java)
+      val eventType = EventType.of(e!!::class.java)
       val codec = eventCodecRegistry.find<E>(eventType).bind()
       val serialized = codec.encode(e).bind()
 
@@ -54,9 +54,9 @@ interface CanComputeNextSummary<S, E> : EventHandlerExecutor<S> {
     val codec = eventCodecRegistry.find<E>(eventType).bind()
     val deserialized = codec.decode(event).bind()
 
-    Either.catch { eventHandler.handle(prevSummary, deserialized) }
-      .mapLeft { EVENT_HANDLER_FAILURE.toException(it, eventType.toString()) }
-      .bind()
+    catch({ eventHandler.handle(prevSummary, deserialized) }) {
+      raise(EVENT_HANDLER_FAILURE.toException(it, eventType.toString()))
+    }
   }
 }
 
@@ -115,7 +115,7 @@ interface CanLoadSummary<S> : CanAggregateEvents<S> {
  * - Serialize events as a [CanSerializeEvents]
  * - Write events as a [CanWriteEvents]
  */
-interface CanExecuteCommandHandler<C, S, E : Any> :
+interface CanExecuteCommandHandler<C, S, E> :
   CanLoadSummary<S>,
   CanSerializeEvents<E>,
   CanWriteEvents<E> {
@@ -129,8 +129,9 @@ interface CanExecuteCommandHandler<C, S, E : Any> :
     val (currentVersion: Version, currentSummary: S) = loadSummary(context.key, tx).bind()
 
     val events =
-      Either.catch { commandHandler.handle(command, currentSummary) }
-        .mapLeft { COMMAND_HANDLER_FAILURE.toException(it) }.bind()
+      catch({ commandHandler.handle(command, currentSummary) }) {
+        raise(COMMAND_HANDLER_FAILURE.toException(it))
+      }
 
     val versionedEvents = serializeEvents(currentVersion, events.events).bind()
 

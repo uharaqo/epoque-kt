@@ -13,16 +13,18 @@ class EpoqueException(cause: Cause, details: String? = null, t: Throwable? = nul
     EVENT_WRITE_FAILURE,
     EVENT_WRITE_CONFLICT,
     EVENT_HANDLER_FAILURE,
-    EVENT_PROJECTION_FAILURE,
     SUMMARY_AGGREGATION_FAILURE,
     COMMAND_NOT_SUPPORTED,
     COMMAND_ENCODING_FAILURE,
     COMMAND_DECODING_FAILURE,
     COMMAND_PREPARATION_FAILURE,
-    COMMAND_HANDLER_FAILURE,
     COMMAND_REJECTED,
-    TIMEOUT_EXCEPTION,
-    UNKNOWN_EXCEPTION,
+    COMMAND_HANDLER_FAILURE,
+    PROJECTION_FAILURE,
+
+    /** An error that should not happen */
+    UNEXPECTED_ERROR,
+    TIMEOUT,
     ;
 
     fun toException(t: Throwable? = null): EpoqueException = toException(t, null)

@@ -18,6 +18,7 @@ import io.github.uharaqo.epoque.builder.CommandRouterFactory
 import io.github.uharaqo.epoque.builder.CommandRouterFactoryBuilder
 import io.github.uharaqo.epoque.builder.DefaultRegistry
 import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironment
+import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactoryFactory
 import io.github.uharaqo.epoque.builder.RegistryBuilder
 import io.github.uharaqo.epoque.builder.WithPreparedParam
 import io.github.uharaqo.epoque.dsl.toCommandCodec
@@ -38,7 +39,7 @@ fun CommandRouter.Companion.fromFactories(
     CommandCodecRegistry(DefaultRegistry(codecs, onError)),
     CommandProcessorRegistry(DefaultRegistry(processors, onError)),
   )
-  return environment.runtimeEnvironmentFactoryFactory.create(defaultCommandRouter, environment)
+  return EpoqueRuntimeEnvironmentFactoryFactory.create().create(defaultCommandRouter, environment)
 }
 
 private class DefaultCommandRouter(

@@ -17,8 +17,8 @@ import io.github.uharaqo.epoque.api.CommandProcessor
 import io.github.uharaqo.epoque.api.EpoqueContext
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.EpoqueException
-import io.github.uharaqo.epoque.api.EpoqueException.Cause.TIMEOUT_EXCEPTION
-import io.github.uharaqo.epoque.api.EpoqueException.Cause.UNKNOWN_EXCEPTION
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.TIMEOUT
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.UNEXPECTED_ERROR
 import io.github.uharaqo.epoque.api.EventCodecRegistry
 import io.github.uharaqo.epoque.api.EventHandlerExecutor
 import io.github.uharaqo.epoque.api.EventReader
@@ -127,8 +127,8 @@ class CommandExecutor<C, S, E : Any>(
       .mapLeft {
         when (it) {
           is EpoqueException -> it
-          is TimeoutCancellationException -> TIMEOUT_EXCEPTION.toException(it)
-          else -> UNKNOWN_EXCEPTION.toException(it)
+          is TimeoutCancellationException -> TIMEOUT.toException(it)
+          else -> UNEXPECTED_ERROR.toException(it)
         }
       }
 
