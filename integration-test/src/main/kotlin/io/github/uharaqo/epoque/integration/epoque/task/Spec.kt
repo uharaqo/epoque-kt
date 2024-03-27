@@ -1,8 +1,11 @@
 package io.github.uharaqo.epoque.integration.epoque.task
 
 import io.github.uharaqo.epoque.Epoque
+import io.github.uharaqo.epoque.api.WriteOption
+import io.github.uharaqo.epoque.codec.JsonCodecFactory
+import io.github.uharaqo.epoque.dsl.MapSummaryCache
+import io.github.uharaqo.epoque.dsl.journalFor
 import io.github.uharaqo.epoque.integration.epoque.project.PROJECT_JOURNAL
-import io.github.uharaqo.epoque.serialization.JsonCodecFactory
 
 // summary with multiple subtypes
 sealed interface Task {
@@ -10,36 +13,52 @@ sealed interface Task {
   data class Default(val started: Boolean) : Task
 }
 
-private val builder = Epoque.journalFor<TaskEvent>(JsonCodecFactory())
+val TASK_JOURNAL = Epoque.journalFor<TaskCommand, Task, TaskEvent>(JsonCodecFactory()) {
+  summaryCache = MapSummaryCache()
 
-val TASK_JOURNAL = builder.summaryFor<Task>(Task.Empty) {
-  eventHandlerFor<TaskCreated> { s, e ->
-    check(s is Task.Empty) { "Already created" }
-    Task.Default(false)
-  }
-  eventHandlerFor<TaskStarted> { s, e ->
-    check(s !is Task.Empty)
-    Task.Default(true)
-  }
-  eventHandlerFor<TaskEnded> { s, e ->
-    check(s !is Task.Empty)
-    Task.Default(false)
-  }
-}
+  commands {
+    defaultWriteOption = WriteOption.JOURNAL_LOCK
 
-val TASK_COMMANDS = builder.with(TASK_JOURNAL).routerFor<TaskCommand> {
-  commandHandlerFor<CreateTask> { c, s ->
-    if (s !is Task.Empty) reject("Already created")
-    if (c.project != null && !exists(PROJECT_JOURNAL, c.project)) reject("Project Not Found")
+    onCommand<CreateTask> {
+      handle { c, s ->
+        if (s !is Task.Empty) reject("Already created")
+        if (c.project != null && !exists(PROJECT_JOURNAL, c.project)) reject("Project Not Found")
 
-    emit(c.toTaskCreated())
+        emit(c.toTaskCreated())
+      }
+    }
+    onCommand<StartTask> {
+      handle { c, s ->
+        if (s !is Task.Default) reject("Not found")
+        if (!s.started) emit(c.toTaskStarted())
+      }
+    }
+    onCommand<EndTask> {
+      handle { c, s ->
+        if (s !is Task.Default) reject("Not found")
+        if (s.started) emit(c.toTaskEnded())
+      }
+    }
   }
-  commandHandlerFor<StartTask> { c, s ->
-    if (s !is Task.Default) reject("Not found")
-    if (!s.started) emit(c.toTaskStarted())
-  }
-  commandHandlerFor<EndTask> { c, s ->
-    if (s !is Task.Default) reject("Not found")
-    if (s.started) emit(c.toTaskEnded())
+
+  events(Task.Empty) {
+    onEvent<TaskCreated> {
+      handle { s, e ->
+        check(s is Task.Empty) { "Already created" }
+        Task.Default(false)
+      }
+    }
+    onEvent<TaskStarted> {
+      handle { s, e ->
+        check(s !is Task.Empty)
+        Task.Default(true)
+      }
+    }
+    onEvent<TaskEnded> {
+      handle { s, e ->
+        check(s !is Task.Empty)
+        Task.Default(false)
+      }
+    }
   }
 }

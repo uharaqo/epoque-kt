@@ -1,5 +1,9 @@
 package io.github.uharaqo.epoque.api
 
+import arrow.core.raise.either
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_NOT_SUPPORTED
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_NOT_SUPPORTED
+
 interface SerializedData {
   fun toText(): String
   fun toByteArray(): ByteArray
@@ -17,13 +21,17 @@ interface DataDecoder<out V> {
 
 interface DataCodec<V> : DataEncoder<V>, DataDecoder<V>
 
+interface DataCodecFactory {
+  fun <V : Any> create(type: Class<V>): DataCodec<V>
+}
+
 @JvmInline
 value class SerializedEvent(val unwrap: SerializedData) {
   override fun toString(): String = unwrap.toString()
 }
 
 @JvmInline
-value class EventType private constructor(private val unwrap: Class<*>) {
+value class EventType private constructor(val unwrap: Class<*>) {
   override fun toString(): String = unwrap.canonicalName!!
 
   companion object {
@@ -47,12 +55,13 @@ data class EventCodec<E>(
 
 @JvmInline
 value class EventCodecRegistry(
-  private val codecs: Registry<EventType, EventCodec<*>>,
+  val registry: Map<EventType, EventCodec<*>>,
 ) {
-
-  fun <E> find(type: EventType): Failable<EventCodec<E>> =
+  fun <E> find(type: EventType): Failable<EventCodec<E>> = either {
     @Suppress("UNCHECKED_CAST")
-    codecs.find(type).map { it as EventCodec<E> }
+    registry[type]?.let { it as EventCodec<E> }
+      ?: raise(EVENT_NOT_SUPPORTED.toException(message = type.toString()))
+  }
 }
 
 @JvmInline
@@ -61,7 +70,7 @@ value class SerializedCommand(val unwrap: SerializedData) {
 }
 
 @JvmInline
-value class CommandType private constructor(private val unwrap: Class<*>) {
+value class CommandType private constructor(val unwrap: Class<*>) {
   override fun toString(): String = unwrap.canonicalName!!
 
   companion object {
@@ -85,12 +94,11 @@ data class CommandCodec<C>(
 
 @JvmInline
 value class CommandCodecRegistry(
-  private val codecs: Registry<CommandType, CommandCodec<*>>,
+  val registry: Map<CommandType, CommandCodec<*>>,
 ) {
-
-  fun <C> find(type: CommandType): Failable<CommandCodec<C>> =
+  fun <E> find(type: CommandType): Failable<CommandCodec<E>> = either {
     @Suppress("UNCHECKED_CAST")
-    codecs.find(type).map { it as CommandCodec<C> }
-
-  fun toMap(): Map<CommandType, CommandCodec<*>> = codecs.toMap()
+    registry[type]?.let { it as CommandCodec<E> }
+      ?: raise(COMMAND_NOT_SUPPORTED.toException(message = type.toString()))
+  }
 }

@@ -1,8 +1,8 @@
-package io.github.uharaqo.epoque.serialization
+package io.github.uharaqo.epoque.codec
 
 import io.github.uharaqo.epoque.api.DataCodec
+import io.github.uharaqo.epoque.api.DataCodecFactory
 import io.github.uharaqo.epoque.api.SerializedData
-import io.github.uharaqo.epoque.builder.DataCodecFactory
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.modules.EmptySerializersModule

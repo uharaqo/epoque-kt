@@ -1,10 +1,11 @@
 package io.github.uharaqo.epoque.integration.epoque.task
 
-import io.github.uharaqo.epoque.db.jooq.EpoqueJooq
+import io.github.uharaqo.epoque.Epoque
+import io.github.uharaqo.epoque.db.jooq.projectionFor
 import org.jooq.impl.DSL.field
 import org.jooq.impl.DSL.table
 
-val TASK_PROJECTIONS = EpoqueJooq.projectionFor(TASK_JOURNAL) {
+val TASK_PROJECTIONS = Epoque.projectionFor(TASK_JOURNAL) {
   projectionFor<TaskCreated> { (k, v, e) ->
     ctx
       .insertInto(table("task"))

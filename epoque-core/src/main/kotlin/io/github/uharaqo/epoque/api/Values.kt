@@ -1,6 +1,5 @@
 package io.github.uharaqo.epoque.api
 
-import io.github.uharaqo.epoque.builder.EpoqueRuntimeEnvironmentFactoryFactory
 import java.time.Instant
 
 @JvmInline
@@ -91,12 +90,23 @@ data class EpoqueEnvironment(
   val eventWriter: EventWriter,
   val transactionStarter: TransactionStarter,
   val defaultCommandExecutorOptions: CommandExecutorOptions?,
-  val callbackHandler: CallbackHandler?,
-  val runtimeEnvironmentFactoryFactory: EpoqueRuntimeEnvironmentFactoryFactory,
+  val globalCallbackHandler: CallbackHandler?,
+  val globalCache: SummaryCache?,
 )
 
-interface Registry<K : Any, V : Any> {
-  fun find(key: K): Failable<V>
+object DeserializedCommand : EpoqueContextKey<Any>
 
-  fun toMap(): Map<K, V>
+@JvmInline
+value class SummaryType(val unwrap: String) {
+  override fun toString(): String = unwrap
+
+  companion object {
+    fun <S> of(clazz: Class<S>): SummaryType = SummaryType(clazz.canonicalName!!)
+    inline fun <reified S> of(): SummaryType = of(S::class.java)
+  }
 }
+
+data class SummaryId(
+  val type: SummaryType,
+  val key: JournalKey,
+)
