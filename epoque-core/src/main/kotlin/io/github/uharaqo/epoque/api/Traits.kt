@@ -33,8 +33,24 @@ interface CanSerializeEvents<E> {
 }
 
 /** Write events by using [EventWriter]. */
-interface CanWriteEvents<E> {
+interface CanWriteEvents<E> : CanSerializeEvents<E> {
   val eventWriter: EventWriter
+
+  suspend fun writeEvents(
+    commandHandlerOutput: CommandHandlerOutput<E>,
+    currentVersion: Version,
+    context: CommandContext,
+    tx: TransactionContext,
+  ): Failable<CommandOutput> = either {
+    val (events: List<E>, metadata: OutputMetadata) = commandHandlerOutput
+
+    val versionedEvents = serializeEvents(currentVersion, events).bind()
+    val output = CommandOutput(versionedEvents, metadata, context)
+
+    eventWriter.writeEvents(output, tx).bind()
+
+    output
+  }
 }
 
 /**
@@ -61,15 +77,14 @@ interface CanComputeNextSummary<S, E> : EventHandlerExecutor<S> {
 }
 
 /** Aggregate events by using [EventHandlerExecutor]. */
-interface CanAggregateEvents<S> {
-  val eventHandlerExecutor: EventHandlerExecutor<S>
+interface CanAggregateEvents<S> : EventHandlerExecutor<S> {
 
   fun aggregateEvents(
     events: List<VersionedEvent>,
     cachedSummary: VersionedSummary<S>?,
   ): Failable<VersionedSummary<S>> = either {
     var currentVersion = (cachedSummary?.version ?: Version.ZERO).unwrap
-    val initialSummary = cachedSummary?.summary ?: eventHandlerExecutor.emptySummary
+    val initialSummary = cachedSummary?.summary ?: emptySummary
 
     val summary = events.fold(initialSummary) { prevSummary, ve ->
       currentVersion += 1
@@ -80,7 +95,7 @@ interface CanAggregateEvents<S> {
         )
       }
 
-      eventHandlerExecutor.computeNextSummary(prevSummary, ve.type, ve.event).bind()
+      computeNextSummary(prevSummary, ve.type, ve.event).bind()
     }
 
     VersionedSummary(Version(currentVersion), summary)
@@ -91,8 +106,9 @@ interface CanAggregateEvents<S> {
  * Load events by using [EventReader] and aggregate them as a summary [S]
  * as an [CanAggregateEvents].
  */
-interface CanLoadSummary<S> : CanAggregateEvents<S> {
+interface CanLoadSummary<S> {
   val eventReader: EventReader
+  val eventAggregator: CanAggregateEvents<S>
 
   suspend fun loadSummary(
     key: JournalKey,
@@ -102,7 +118,7 @@ interface CanLoadSummary<S> : CanAggregateEvents<S> {
     val prevVersion = cachedSummary?.version ?: Version.ZERO
     val events = eventReader.queryById(key, prevVersion, tx).bind().toList()
 
-    aggregateEvents(events, cachedSummary).bind()
+    eventAggregator.aggregateEvents(events, cachedSummary).bind()
   }
 }
 
@@ -117,7 +133,6 @@ interface CanLoadSummary<S> : CanAggregateEvents<S> {
  */
 interface CanExecuteCommandHandler<C, S, E> :
   CanLoadSummary<S>,
-  CanSerializeEvents<E>,
   CanWriteEvents<E> {
 
   suspend fun execute(
@@ -128,17 +143,11 @@ interface CanExecuteCommandHandler<C, S, E> :
   ): Failable<CommandOutput> = either {
     val (currentVersion: Version, currentSummary: S) = loadSummary(context.key, tx).bind()
 
-    val events =
+    val commandHandlerOutput =
       catch({ commandHandler.handle(command, currentSummary) }) {
         raise(COMMAND_HANDLER_FAILURE.toException(it))
       }
 
-    val versionedEvents = serializeEvents(currentVersion, events.events).bind()
-
-    val output = CommandOutput(versionedEvents, events.metadata, context)
-
-    eventWriter.writeEvents(output, tx).bind()
-
-    output
+    writeEvents(commandHandlerOutput, currentVersion, context, tx).bind()
   }
 }

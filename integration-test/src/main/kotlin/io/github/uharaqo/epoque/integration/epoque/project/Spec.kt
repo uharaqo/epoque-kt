@@ -1,34 +1,47 @@
 package io.github.uharaqo.epoque.integration.epoque.project
 
 import io.github.uharaqo.epoque.Epoque
+import io.github.uharaqo.epoque.api.WriteOption
 import io.github.uharaqo.epoque.codec.JsonCodecFactory
-import io.github.uharaqo.epoque.impl.journalFor
+import io.github.uharaqo.epoque.dsl.journalFor
 import io.github.uharaqo.epoque.integration.epoque.task.CreateTask
 
-// simple summary without any sub types
+// Simple nullable summary without any subtypes
 data object Project
 
-private val builder = Epoque.journalFor<ProjectEvent>(JsonCodecFactory())
+val PROJECT_JOURNAL = Epoque.journalFor<ProjectCommand, Project?, ProjectEvent>(JsonCodecFactory()) {
+  summaryCache = null
 
-val PROJECT_JOURNAL = builder.summaryFor<Project?>(null) {
-  eventHandlerFor<ProjectCreated> { s, e ->
-    check(s == null) { "Project already exists" }
-    Project
-  }
-}
+  commands {
+    defaultWriteOption = WriteOption.DEFAULT
 
-val PROJECT_COMMANDS = builder.with(PROJECT_JOURNAL).routerFor<ProjectCommand> {
-  commandHandlerFor<CreateProject, String>(
-    { c -> "PREPARED" },
-  ) { c, s, x ->
-    println("Prepared Param: $x")
-    if (s != null) reject("Project already exists")
+    onCommand<CreateProject> {
+      writeOption = WriteOption.JOURNAL_LOCK
+      prepare {
+        "PREPARED"
+      } handle { c, s, x ->
+        println("Prepared: $x")
+        if (s != null) reject("Project already exists")
+        chain("Foo", CreateTask("TaskX"))
+        emit(c.toProjectCreated())
+      }
 
-    chain("Foo", CreateTask("TaskX"))
-    notify {
-      println("NOTIFICATION SENT")
+      project {
+        println("PROJECTION")
+      }
+
+      notify {
+        println("NOTIFICATION SENT")
+      }
     }
+  }
 
-    emit(c.toProjectCreated())
+  events(null) {
+    onEvent<ProjectCreated> {
+      handle { s, e ->
+        check(s == null) { "Project already exists" }
+        Project
+      }
+    }
   }
 }

@@ -45,6 +45,8 @@ interface CallbackHandler {
     }
 
   companion object {
-    val EMPTY = object : CallbackHandler {}
+    val EMPTY = object : CallbackHandler {
+      override fun plus(other: CallbackHandler): CallbackHandler = other
+    }
   }
 }

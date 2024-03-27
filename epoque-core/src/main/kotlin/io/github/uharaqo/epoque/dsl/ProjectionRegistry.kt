@@ -1,4 +1,4 @@
-package io.github.uharaqo.epoque.builder
+package io.github.uharaqo.epoque.dsl
 
 import arrow.core.getOrElse
 import io.github.uharaqo.epoque.api.CallbackHandler

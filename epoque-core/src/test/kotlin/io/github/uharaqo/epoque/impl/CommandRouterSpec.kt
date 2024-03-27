@@ -1,41 +1,38 @@
 package io.github.uharaqo.epoque.impl
 
-import io.github.uharaqo.epoque.Epoque
 import io.github.uharaqo.epoque.api.CommandInput
-import io.github.uharaqo.epoque.impl.TestEnvironment.TestCommand
-import io.github.uharaqo.epoque.impl.TestEnvironment.TestEvent
-import io.github.uharaqo.epoque.impl.TestEnvironment.TestSummary
+import io.github.uharaqo.epoque.api.CommandType
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_NOT_SUPPORTED
 import io.kotest.assertions.arrow.core.rethrow
+import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import io.mockk.mockk
 
 class CommandRouterSpec : StringSpec(
   {
-    "Command decoder and processor are found and executed properly in a Workflow" {
-      // given
-      val commandRouter =
-        Epoque
-          .routerFor<TestCommand, TestSummary, TestEvent>(TEST_JOURNAL, jsonCodecFactory) {
-            commandHandlerFor<TestCommand.Create> { command, summary ->
-              emit(dummyEvents)
-            }
-          }
-          .create(dummyEnvironment)
-          .let { DefaultEpoqueRuntimeEnvironmentFactory(it, mockk()) }
+    // given
+    val (eventWriter, capturedOutput) = newMockWriter()
+    val input = CommandInput(dummyJournalKey.id, dummyCommandType, serializedCommand)
 
+    val router = newTestRouter(eventWriter).commandProcessorRegistry
+
+    "Command decoder and processor are found and executed properly in a Workflow" {
       // when
-      val input = CommandInput(
-        id = dummyJournalKey.id,
-        type = dummyCommandType,
-        payload = serializedCommand,
-      )
-      val output = commandRouter.process(input).rethrow()
+      val output = router.find(dummyCommandType).rethrow().process(
+        input,
+      ).rethrow()
 
       // then
+      output.events shouldBe capturedOutput.captured.events
       output.events shouldBe dummyOutputEvents
-      output.metadata shouldBe dummyOutputMetadata
-      output.context.copy(receivedTime = dummyReceivedTime) shouldBe dummyCommandContext
+    }
+
+    "Command not supported" {
+      // when
+      val output = router.find(CommandType.of<Long>())
+
+      // then
+      output shouldBeLeft COMMAND_NOT_SUPPORTED.toException(message = "java.lang.Long")
     }
   },
 ) {

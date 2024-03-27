@@ -3,19 +3,24 @@ package io.github.uharaqo.epoque.db.jooq
 import arrow.core.getOrElse
 import io.github.uharaqo.epoque.Epoque
 import io.github.uharaqo.epoque.api.EventCodec
+import io.github.uharaqo.epoque.api.EventCodecRegistry
 import io.github.uharaqo.epoque.api.EventType
 import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.Projection
 import io.github.uharaqo.epoque.api.ProjectionEvent
 import io.github.uharaqo.epoque.api.TransactionContext
-import io.github.uharaqo.epoque.builder.ProjectionRegistry
-import io.github.uharaqo.epoque.builder.RegistryBuilder
+import io.github.uharaqo.epoque.dsl.ProjectionRegistry
 
-fun <S, E : Any> Epoque.projectionFor(
-  journal: Journal<S, E>,
-  block: JooqProjectionBuilder<S, E>.() -> Unit,
+fun <E : Any> Epoque.projectionFor(
+  journal: Journal<*, *, E>,
+  block: JooqProjectionBuilder<E>.() -> Unit,
+): ProjectionRegistry = Epoque.projectionFor(journal.eventCodecRegistry, block)
+
+fun <E : Any> Epoque.projectionFor(
+  eventCodecRegistry: EventCodecRegistry,
+  block: JooqProjectionBuilder<E>.() -> Unit,
 ): ProjectionRegistry =
-  JooqProjectionBuilder(journal).apply(block).build()
+  JooqProjectionBuilder<E>(eventCodecRegistry).apply(block).build()
 
 fun interface JooqProjection<E> {
   suspend fun JooqTransactionContext.process(event: ProjectionEvent<E>)
@@ -31,19 +36,17 @@ class DefaultJooqProjection<E>(
   }
 }
 
-class JooqProjectionBuilder<S, E : Any>(private val journal: Journal<S, E>) {
-  private val registryBuilder = RegistryBuilder<EventType, Projection<E>>()
+class JooqProjectionBuilder<E : Any>(private val eventCodecRegistry: EventCodecRegistry) {
+  private val projections = mutableMapOf<EventType, Projection<E>>()
 
   inline fun <reified CE : E> projectionFor(projection: JooqProjection<CE>) =
     @Suppress("UNCHECKED_CAST")
     projectionFor(EventType.of<CE>(), projection as JooqProjection<E>)
 
   fun projectionFor(eventType: EventType, projection: JooqProjection<E>) {
-    val codec =
-      journal.eventCodecRegistry.find<E>(eventType)
-        .getOrElse { throw IllegalStateException("EventType not supported. type: $eventType, journalGroupId: ${journal.journalGroupId}") }
-    registryBuilder[eventType] = DefaultJooqProjection(codec, projection)
+    val codec = eventCodecRegistry.find<E>(eventType).getOrElse { throw it }
+    projections[eventType] = DefaultJooqProjection(codec, projection)
   }
 
-  fun build(): ProjectionRegistry = ProjectionRegistry(registryBuilder.buildIntoMap())
+  fun build(): ProjectionRegistry = ProjectionRegistry(projections)
 }

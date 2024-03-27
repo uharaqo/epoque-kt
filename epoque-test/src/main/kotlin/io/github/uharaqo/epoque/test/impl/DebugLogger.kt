@@ -9,22 +9,22 @@ class DebugLogger : CallbackHandler {
   private val logger = LoggerFactory.getLogger(DebugLogger::class.java)
 
   override suspend fun beforeBegin(context: CommandContext) {
-    if (logger.isDebugEnabled) logger.debug("> BeforeBegin: $context")
+    if (logger.isDebugEnabled) logger.debug("--- BeforeBegin: $context ---")
   }
 
   override suspend fun afterBegin(context: CommandContext) {
-    if (logger.isDebugEnabled) logger.debug("> AfterBegin")
+    if (logger.isDebugEnabled) logger.debug("--- AfterBegin ---")
   }
 
   override suspend fun beforeCommit(output: CommandOutput) {
-    if (logger.isDebugEnabled) logger.debug("> BeforeCommit: $output")
+    if (logger.isDebugEnabled) logger.debug("--- BeforeCommit: $output ---")
   }
 
   override suspend fun afterCommit(output: CommandOutput) {
-    if (logger.isDebugEnabled) logger.debug("> AfterCommit")
+    if (logger.isDebugEnabled) logger.debug("--- AfterCommit ---")
   }
 
   override suspend fun afterRollback(context: CommandContext, error: Throwable) {
-    logger.error("> AfterRollback", error)
+    logger.error("--- AfterRollback ---", error)
   }
 }

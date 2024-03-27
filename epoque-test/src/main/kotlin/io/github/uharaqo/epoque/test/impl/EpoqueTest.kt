@@ -17,6 +17,7 @@ import io.github.uharaqo.epoque.api.EventStore
 import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
+import io.github.uharaqo.epoque.api.SummaryCache
 import io.github.uharaqo.epoque.api.TransactionStarter
 import io.github.uharaqo.epoque.api.WriteOption
 import io.github.uharaqo.epoque.db.jooq.JooqEventStore
@@ -69,25 +70,27 @@ fun Epoque.newTestEnvironment(
     timeoutMillis = 30000,
     writeOption = WriteOption.JOURNAL_LOCK,
   ),
-  callbackHandler: CallbackHandler = DebugLogger(),
+  globalCallbackHandler: CallbackHandler = DebugLogger(),
+  globalCache: SummaryCache? = null,
 ): EpoqueEnvironment =
   EpoqueEnvironment(
     eventReader = eventStore,
     eventWriter = eventStore,
     transactionStarter = eventStore,
     defaultCommandExecutorOptions = options,
-    callbackHandler = callbackHandler,
+    globalCallbackHandler = globalCallbackHandler,
+    globalCache = globalCache,
   )
 
 class DefaultTester(
   val commandRouter: CommandRouter,
   val environment: EpoqueEnvironment,
 ) : Tester {
-  override fun <S, E : Any> forJournal(journal: Journal<S, E>): CommandTester<S, E> =
+  override fun <S, E : Any> forJournal(journal: Journal<*, S, E>): CommandTester<S, E> =
     DefaultCommandTester(commandRouter, environment, journal)
 
   override fun <S, E : Any> forJournal(
-    journal: Journal<S, E>,
+    journal: Journal<*, S, E>,
     block: CommandTester<S, E>.() -> Unit,
   ) {
     forJournal(journal).apply(block)
@@ -97,7 +100,7 @@ class DefaultTester(
 class DefaultCommandTester<S, E : Any>(
   val commandRouter: CommandRouter,
   val environment: EpoqueEnvironment,
-  val journal: Journal<S, E>,
+  val journal: Journal<*, S, E>,
 ) : CommandTester<S, E> {
   override fun command(
     id: JournalId,
@@ -107,7 +110,7 @@ class DefaultCommandTester<S, E : Any>(
   ) {
     either {
       val type = CommandType.of(command::class.java)
-      val commandCodec = commandRouter.commandCodecRegistry.find<Any>(type).bind()
+      val commandCodec = journal.commandCodecRegistry.find<Any>(type).bind()
       val payload = commandCodec.encode(command).bind()
       val input = CommandInput(id, type, payload, metadata)
 
@@ -124,7 +127,7 @@ class DefaultCommandTester<S, E : Any>(
 class DefaultCommandValidator<S, E : Any>(
   val input: CommandInput,
   result: CommandOutput,
-  val journal: Journal<S, E>,
+  val journal: Journal<*, S, E>,
   private val summaryProvider: SummaryProvider<S, E>,
 ) : Validator<S, E> {
 
@@ -140,11 +143,11 @@ class DefaultCommandValidator<S, E : Any>(
 }
 
 class SummaryProvider<S, E : Any>(
-  private val journal: Journal<S, E>,
+  private val journal: Journal<*, S, E>,
   private val transactionStarter: TransactionStarter,
   override val eventReader: EventReader,
 ) : CanLoadSummary<S> {
-  override val eventHandlerExecutor = journal
+  override val eventAggregator = journal
 
   suspend fun get(id: JournalId): S =
     transactionStarter.startDefaultTransaction { tx ->
