@@ -32,7 +32,8 @@ class JournalBuilder<C : Any, S, E : Any>(
     eventHandlersBuilder = EventHandlersBuilder<S, E>().apply(block)
   }
 
-  fun build(codecFactory: DataCodecFactory): Journal<C, S, E> {
+  fun build(): Journal<C, S, E> {
+    val codecFactory = codecFactory.shouldBeDefined("codecFactory")
     val eventHandlers = eventHandlersBuilder.shouldBeDefined("events").build(codecFactory)
     val commandHandlers = commandHandlersBuilder.shouldBeDefined("commands").build(codecFactory)
 

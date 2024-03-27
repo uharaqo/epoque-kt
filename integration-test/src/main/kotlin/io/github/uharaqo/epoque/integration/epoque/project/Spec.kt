@@ -9,7 +9,8 @@ import io.github.uharaqo.epoque.integration.epoque.task.CreateTask
 // Simple nullable summary without any subtypes
 data object Project
 
-val PROJECT_JOURNAL = Epoque.journalFor<ProjectCommand, Project?, ProjectEvent>(JsonCodecFactory()) {
+val PROJECT_JOURNAL = Epoque.journalFor<ProjectCommand, Project?, ProjectEvent> {
+  codecFactory = JsonCodecFactory()
   summaryCache = null
 
   commands {

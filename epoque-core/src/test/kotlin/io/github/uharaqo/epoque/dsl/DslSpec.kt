@@ -19,7 +19,6 @@ import io.github.uharaqo.epoque.api.Version
 import io.github.uharaqo.epoque.api.VersionedEvent
 import io.github.uharaqo.epoque.api.VersionedSummary
 import io.github.uharaqo.epoque.api.WriteOption
-import io.github.uharaqo.epoque.codec.JsonCodecFactory
 import io.github.uharaqo.epoque.codec.SerializedJson
 import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.assertions.arrow.core.shouldBeLeft
@@ -35,14 +34,16 @@ class DslSpec : StringSpec(
   {
     "'events' must be defined" {
       shouldThrow<IllegalStateException> {
-        Epoque.journalFor<TestCommand, TestSummary, TestEvent>(JsonCodecFactory()) {
+        Epoque.journalFor<TestCommand, TestSummary, TestEvent> {
+          codecFactory = jsonCodecFactory
         }
       } shouldHaveMessage "'events' must be defined"
     }
 
     "'commands' must be defined" {
       shouldThrow<IllegalStateException> {
-        Epoque.journalFor<TestCommand, TestSummary, TestEvent>(JsonCodecFactory()) {
+        Epoque.journalFor<TestCommand, TestSummary, TestEvent> {
+          codecFactory = jsonCodecFactory
           events(TestSummary.Empty) {
           }
         }
@@ -50,7 +51,8 @@ class DslSpec : StringSpec(
     }
 
     "Empty but it's valid" {
-      Epoque.journalFor<TestCommand, TestSummary, TestEvent>(JsonCodecFactory()) {
+      Epoque.journalFor<TestCommand, TestSummary, TestEvent> {
+        codecFactory = jsonCodecFactory
         events(TestSummary.Empty) {
         }
         commands {
@@ -60,7 +62,8 @@ class DslSpec : StringSpec(
 
     "'events.onEvent.handle' must be defined" {
       shouldThrow<IllegalStateException> {
-        Epoque.journalFor<TestCommand, TestSummary, TestEvent>(JsonCodecFactory()) {
+        Epoque.journalFor<TestCommand, TestSummary, TestEvent> {
+          codecFactory = jsonCodecFactory
           events(TestSummary.Empty) {
             onEvent<ResourceCreated> {
             }
@@ -73,7 +76,8 @@ class DslSpec : StringSpec(
 
     "'commands.onCommand.handle' must be defined" {
       shouldThrow<IllegalStateException> {
-        Epoque.journalFor<TestCommand, TestSummary, TestEvent>(JsonCodecFactory()) {
+        Epoque.journalFor<TestCommand, TestSummary, TestEvent> {
+          codecFactory = jsonCodecFactory
           events(TestSummary.Empty) {
             onEvent<ResourceCreated> {
               handle { s, e -> s }
@@ -89,7 +93,8 @@ class DslSpec : StringSpec(
     "'environment' must be defined" {
       shouldThrow<IllegalStateException> {
         Epoque.routerFor(
-          Epoque.journalFor<TestCommand, TestSummary, TestEvent>(JsonCodecFactory()) {
+          Epoque.journalFor<TestCommand, TestSummary, TestEvent> {
+            codecFactory = jsonCodecFactory
             events(TestSummary.Empty) {
               onEvent<ResourceCreated> {
                 handle { s, e -> s }
@@ -111,7 +116,8 @@ class DslSpec : StringSpec(
       val (eventWriter, capturedOutput) = newMockWriter()
 
       val router = Epoque.routerFor(
-        Epoque.journalFor<TestCommand, TestSummary, TestEvent>(JsonCodecFactory()) {
+        Epoque.journalFor<TestCommand, TestSummary, TestEvent> {
+          codecFactory = jsonCodecFactory
           events(TestSummary.Empty) {
             onEvent<ResourceCreated> {
               handle { s, e -> s }
@@ -132,7 +138,8 @@ class DslSpec : StringSpec(
 
     "Rejected" {
       val router = Epoque.routerFor(
-        Epoque.journalFor<TestCommand, Void?, Void>(JsonCodecFactory()) {
+        Epoque.journalFor<TestCommand, Void?, Void> {
+          codecFactory = jsonCodecFactory
           events(null) {
           }
           commands {
@@ -168,7 +175,8 @@ class DslSpec : StringSpec(
       val cache = MapSummaryCache()
 
       val router = Epoque.routerFor(
-        Epoque.journalFor<TestCommand, TestSummary, TestEvent>(JsonCodecFactory()) {
+        Epoque.journalFor<TestCommand, TestSummary, TestEvent> {
+          codecFactory = jsonCodecFactory
           summaryCache = cache
 
           events(TestSummary.Empty) {
@@ -190,9 +198,10 @@ class DslSpec : StringSpec(
                 "Prepared Param"
               } handle { s, e, x ->
                 record("Handled")
-                exists(dummyJournalKey)
                 emit(ResourceCreated(x))
-                chain(dummyJournalKey.id, EmptyCommand)
+                if (exists(dummyJournalKey)) {
+                  chain(dummyJournalKey.id, EmptyCommand)
+                }
               }
 
               project { record("Projected") }

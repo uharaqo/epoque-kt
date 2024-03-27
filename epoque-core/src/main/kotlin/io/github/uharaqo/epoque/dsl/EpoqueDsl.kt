@@ -1,5 +1,6 @@
 package io.github.uharaqo.epoque.dsl
 
+import io.github.uharaqo.epoque.api.DataCodecFactory
 import io.github.uharaqo.epoque.api.SummaryCache
 import kotlin.annotation.AnnotationTarget.CLASS
 import kotlin.annotation.AnnotationTarget.FUNCTION
@@ -12,6 +13,7 @@ annotation class JournalDslMarker
 
 @JournalDslMarker
 abstract class JournalDsl<C : Any, S, E : Any> {
+  var codecFactory: DataCodecFactory? = null
   var summaryCache: SummaryCache? = null
 
   abstract fun commands(block: CommandHandlersDsl<C, S, E>.() -> Unit)
