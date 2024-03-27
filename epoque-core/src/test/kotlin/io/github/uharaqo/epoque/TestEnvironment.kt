@@ -1,7 +1,6 @@
-package io.github.uharaqo.epoque.impl
+package io.github.uharaqo.epoque
 
 import arrow.core.right
-import io.github.uharaqo.epoque.Epoque
 import io.github.uharaqo.epoque.api.CallbackHandler
 import io.github.uharaqo.epoque.api.CommandContext
 import io.github.uharaqo.epoque.api.CommandExecutorOptions

@@ -1,19 +1,9 @@
-package io.github.uharaqo.epoque.impl
+package io.github.uharaqo.epoque.api
 
 import arrow.core.getOrElse
 import arrow.core.right
-import io.github.uharaqo.epoque.api.CanAggregateEvents
-import io.github.uharaqo.epoque.api.CanLoadSummary
-import io.github.uharaqo.epoque.api.EventReader
-import io.github.uharaqo.epoque.api.EventType
-import io.github.uharaqo.epoque.api.Failable
-import io.github.uharaqo.epoque.api.JournalKey
-import io.github.uharaqo.epoque.api.SerializedEvent
-import io.github.uharaqo.epoque.api.TransactionContext
-import io.github.uharaqo.epoque.api.Version
-import io.github.uharaqo.epoque.api.VersionedEvent
-import io.github.uharaqo.epoque.api.VersionedSummary
-import io.github.uharaqo.epoque.impl.TestEnvironment.MockSummary
+import io.github.uharaqo.epoque.TestEnvironment
+import io.github.uharaqo.epoque.TestEnvironment.MockSummary
 import io.kotest.assertions.throwables.shouldThrowMessage
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe

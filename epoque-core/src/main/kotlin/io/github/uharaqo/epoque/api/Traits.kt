@@ -144,8 +144,8 @@ interface CanExecuteCommandHandler<C, S, E> :
     val (currentVersion: Version, currentSummary: S) = loadSummary(context.key, tx).bind()
 
     val commandHandlerOutput =
-      catch({ commandHandler.handle(command, currentSummary) }) {
-        raise(COMMAND_HANDLER_FAILURE.toException(it))
+      catch({ commandHandler.handle(command, currentSummary) }) { t ->
+        raise(if (t is EpoqueException) t else COMMAND_HANDLER_FAILURE.toException(t))
       }
 
     writeEvents(commandHandlerOutput, currentVersion, context, tx).bind()

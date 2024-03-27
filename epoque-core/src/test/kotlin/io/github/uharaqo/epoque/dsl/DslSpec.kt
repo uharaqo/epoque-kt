@@ -1,26 +1,35 @@
 package io.github.uharaqo.epoque.dsl
 
+import arrow.core.right
 import io.github.uharaqo.epoque.Epoque
+import io.github.uharaqo.epoque.TestEnvironment
+import io.github.uharaqo.epoque.TestEnvironment.TestCommand
+import io.github.uharaqo.epoque.TestEnvironment.TestCommand.Create
+import io.github.uharaqo.epoque.TestEnvironment.TestCommand.EmptyCommand
+import io.github.uharaqo.epoque.TestEnvironment.TestEvent
+import io.github.uharaqo.epoque.TestEnvironment.TestEvent.ResourceCreated
+import io.github.uharaqo.epoque.TestEnvironment.TestSummary
 import io.github.uharaqo.epoque.api.CommandInput
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_REJECTED
+import io.github.uharaqo.epoque.api.EventReader
 import io.github.uharaqo.epoque.api.SerializedEvent
 import io.github.uharaqo.epoque.api.SummaryId
 import io.github.uharaqo.epoque.api.SummaryType
 import io.github.uharaqo.epoque.api.Version
+import io.github.uharaqo.epoque.api.VersionedEvent
 import io.github.uharaqo.epoque.api.VersionedSummary
+import io.github.uharaqo.epoque.api.WriteOption
 import io.github.uharaqo.epoque.codec.JsonCodecFactory
 import io.github.uharaqo.epoque.codec.SerializedJson
-import io.github.uharaqo.epoque.impl.TestEnvironment
-import io.github.uharaqo.epoque.impl.TestEnvironment.TestCommand
-import io.github.uharaqo.epoque.impl.TestEnvironment.TestCommand.Create
-import io.github.uharaqo.epoque.impl.TestEnvironment.TestCommand.EmptyCommand
-import io.github.uharaqo.epoque.impl.TestEnvironment.TestEvent
-import io.github.uharaqo.epoque.impl.TestEnvironment.TestEvent.ResourceCreated
-import io.github.uharaqo.epoque.impl.TestEnvironment.TestSummary
 import io.kotest.assertions.arrow.core.rethrow
+import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.throwable.shouldHaveMessage
+import io.mockk.coEvery
+import io.mockk.mockk
+import kotlinx.coroutines.flow.flowOf
 
 class DslSpec : StringSpec(
   {
@@ -121,6 +130,33 @@ class DslSpec : StringSpec(
       capturedOutput.captured.events shouldBe dummyOutputEvents
     }
 
+    "Rejected" {
+      val router = Epoque.routerFor(
+        Epoque.journalFor<TestCommand, Void?, Void>(JsonCodecFactory()) {
+          events(null) {
+          }
+          commands {
+            onCommand<Create> {
+              handle { s, e -> reject("Rejected") }
+            }
+          }
+        },
+      ) {
+        environment {
+          val mockReader = mockk<EventReader>()
+          coEvery {
+            mockReader.queryById(any(), any(), any())
+          } returns flowOf<VersionedEvent>().right()
+          eventReader = mockReader
+          eventStore = dummyEventStore()
+        }
+      }
+
+      val out = router.process(input)
+
+      out shouldBeLeft COMMAND_REJECTED.toException(message = "Rejected")
+    }
+
     "Full features" {
       val (eventWriter, capturedOutput) = newMockWriter()
       val recorded = mutableListOf<String>()
@@ -141,7 +177,9 @@ class DslSpec : StringSpec(
             }
           }
           commands {
+            defaultWriteOption = WriteOption.JOURNAL_LOCK
             onCommand<EmptyCommand> {
+              writeOption = WriteOption.DEFAULT
               handle { c, s ->
                 record("Chained")
               }

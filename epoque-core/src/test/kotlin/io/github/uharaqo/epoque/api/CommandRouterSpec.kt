@@ -1,7 +1,6 @@
-package io.github.uharaqo.epoque.impl
+package io.github.uharaqo.epoque.api
 
-import io.github.uharaqo.epoque.api.CommandInput
-import io.github.uharaqo.epoque.api.CommandType
+import io.github.uharaqo.epoque.TestEnvironment
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_NOT_SUPPORTED
 import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.assertions.arrow.core.shouldBeLeft

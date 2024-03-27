@@ -56,7 +56,7 @@ class IntegrationSpec : StringSpec(
       shouldThrow<EpoqueException> {
         projectTester.command(projectId1, CreateProject(project1), meta) {
         }
-      }.cause!! shouldHaveMessage "COMMAND_REJECTED: Project already exists"
+      } shouldHaveMessage "COMMAND_REJECTED: Project already exists"
     }
     "Register task" {
       taskTester.command(taskId1, CreateTask(task1, startedAt, project1, setOf("tag1", "tag2"))) {

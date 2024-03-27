@@ -1,17 +1,10 @@
-package io.github.uharaqo.epoque.impl
+package io.github.uharaqo.epoque.api
 
-import io.github.uharaqo.epoque.api.CanWriteEvents
-import io.github.uharaqo.epoque.api.CommandOutput
-import io.github.uharaqo.epoque.api.CommandType
+import io.github.uharaqo.epoque.TestEnvironment
+import io.github.uharaqo.epoque.TestEnvironment.TestEvent
+import io.github.uharaqo.epoque.TestEnvironment.TestEvent.ResourceCreated
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_NOT_SUPPORTED
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.EVENT_NOT_SUPPORTED
-import io.github.uharaqo.epoque.api.EventCodec
-import io.github.uharaqo.epoque.api.EventCodecRegistry
-import io.github.uharaqo.epoque.api.EventType
-import io.github.uharaqo.epoque.api.SerializedEvent
-import io.github.uharaqo.epoque.api.TransactionContext
-import io.github.uharaqo.epoque.impl.TestEnvironment.TestEvent
-import io.github.uharaqo.epoque.impl.TestEnvironment.TestEvent.ResourceCreated
 import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.core.spec.style.StringSpec

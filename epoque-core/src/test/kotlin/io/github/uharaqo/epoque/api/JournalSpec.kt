@@ -1,8 +1,7 @@
-package io.github.uharaqo.epoque.impl
+package io.github.uharaqo.epoque.api
 
-import io.github.uharaqo.epoque.api.Version
-import io.github.uharaqo.epoque.api.VersionedSummary
-import io.github.uharaqo.epoque.impl.TestEnvironment.TestSummary
+import io.github.uharaqo.epoque.TestEnvironment
+import io.github.uharaqo.epoque.TestEnvironment.TestSummary
 import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
