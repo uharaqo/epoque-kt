@@ -13,7 +13,8 @@ sealed interface Task {
   data class Default(val started: Boolean) : Task
 }
 
-val TASK_JOURNAL = Epoque.journalFor<TaskCommand, Task, TaskEvent>(JsonCodecFactory()) {
+val TASK_JOURNAL = Epoque.journalFor<TaskCommand, Task, TaskEvent> {
+  codecFactory = JsonCodecFactory()
   summaryCache = MapSummaryCache()
 
   commands {

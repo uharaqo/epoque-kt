@@ -4,7 +4,6 @@ import io.github.uharaqo.epoque.Epoque
 import io.github.uharaqo.epoque.api.CommandCodecRegistry
 import io.github.uharaqo.epoque.api.CommandProcessor
 import io.github.uharaqo.epoque.api.CommandProcessorRegistry
-import io.github.uharaqo.epoque.api.DataCodecFactory
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
 import io.github.uharaqo.epoque.api.EventCodecRegistry
 import io.github.uharaqo.epoque.api.EventHandlerRegistry
@@ -27,18 +26,16 @@ fun Epoque.routerFor(
   EpoqueBuilder(journals).apply(block).build()
 
 inline fun <C : Any, reified S, reified E : Any> Epoque.journalFor(
-  codecFactory: DataCodecFactory,
   noinline block: JournalDsl<C, S, E>.() -> Unit,
 ): Journal<C, S, E> =
-  journalFor(JournalGroupId.of<E>(), SummaryType.of<S>(), codecFactory, block)
+  journalFor(JournalGroupId.of<E>(), SummaryType.of<S>(), block)
 
 fun <C : Any, S, E : Any> Epoque.journalFor(
   journalGroupId: JournalGroupId,
   summaryType: SummaryType,
-  codecFactory: DataCodecFactory,
   block: JournalDsl<C, S, E>.() -> Unit,
 ): Journal<C, S, E> =
-  JournalBuilder<C, S, E>(journalGroupId, summaryType).apply(block).build(codecFactory)
+  JournalBuilder<C, S, E>(journalGroupId, summaryType).apply(block).build()
 
 internal fun <T> T.shouldBeNull(name: String) {
   check(this == null) { "'$name' is already defined" }

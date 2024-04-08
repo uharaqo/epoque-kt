@@ -61,6 +61,7 @@ abstract class TestEnvironment {
   operator fun MockSummary.plus(event: SerializedEvent): MockSummary =
     this.copy(list = list + event)
 
+  val jsonCodecFactory = JsonCodecFactory()
   val serializedEvent1 = SerializedEvent(SerializedJson("""{"name":"1"}"""))
   val serializedEvent2 = SerializedEvent(SerializedJson("""{"name":"2"}"""))
   val serializedCommand = SerializedCommand(SerializedJson("""{"name": "foo"}"""))
@@ -159,9 +160,8 @@ abstract class TestEnvironment {
       dummyTransactionStarter.startDefaultTransaction(block)
   }
 
-  val jsonCodecFactory = JsonCodecFactory()
-
-  val TEST_JOURNAL = Epoque.journalFor<TestCommand, TestSummary, TestEvent>(jsonCodecFactory) {
+  val TEST_JOURNAL = Epoque.journalFor<TestCommand, TestSummary, TestEvent>() {
+    codecFactory = jsonCodecFactory
     commands {
       onCommand<TestCommand.Create> {
         handle { c, s ->
