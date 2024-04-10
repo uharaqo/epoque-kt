@@ -1,7 +1,6 @@
 package io.github.uharaqo.epoque.dsl
 
 import io.github.uharaqo.epoque.api.CommandCodecRegistry
-import io.github.uharaqo.epoque.api.DataCodecFactory
 import io.github.uharaqo.epoque.api.EventCodecRegistry
 import io.github.uharaqo.epoque.api.EventHandlerRegistry
 import io.github.uharaqo.epoque.api.Journal
