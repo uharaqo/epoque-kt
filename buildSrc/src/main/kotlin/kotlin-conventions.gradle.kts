@@ -51,7 +51,7 @@ jacoco {
 }
 tasks.jacocoTestReport {
   reports {
-    csv.required.set(false)
+    csv.required.set(true)
     xml.required.set(true)
   }
 }

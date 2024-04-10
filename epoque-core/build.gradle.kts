@@ -1,3 +1,5 @@
+import Sonatype_publish_gradle.Publish.toSonatype
+
 plugins {
   id("kotlin-conventions")
   // this serialization plugin is only required for testing
@@ -15,3 +17,10 @@ dependencies {
   testImplementation(libs.mockk)
   testImplementation(libs.logback.classic)
 }
+
+toSonatype(
+  userName = "uharaqo",
+  repoName = "epoque-kt",
+  artifactName = project.name,
+  artifactDesc = "Transactional Event Sourcing Processor in Kotlin",
+)

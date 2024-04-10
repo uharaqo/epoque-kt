@@ -1,3 +1,5 @@
+import Sonatype_publish_gradle.Publish.toSonatype
+
 plugins {
   id("kotlin-conventions")
 }
@@ -14,3 +16,10 @@ dependencies {
   testImplementation(libs.logback.classic)
   testImplementation(libs.h2)
 }
+
+toSonatype(
+  userName = "uharaqo",
+  repoName = "epoque-kt",
+  artifactName = project.name,
+  artifactDesc = "jOOQ plugin for epoque-kt",
+)
