@@ -47,6 +47,7 @@ configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
 
 jacoco {
   toolVersion = "0.8.11"
+  reportsDirectory.set(project.layout.buildDirectory.dir("jacoco"))
 }
 tasks.jacocoTestReport {
   reports {
