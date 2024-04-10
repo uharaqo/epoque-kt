@@ -1,6 +1,7 @@
 plugins {
   id("org.jetbrains.kotlin.jvm")
   `java-library`
+  id("jacoco")
   id("org.jlleitschuh.gradle.ktlint")
   id("org.jlleitschuh.gradle.ktlint-idea")
 }
@@ -20,6 +21,8 @@ java {
   toolchain {
     languageVersion.set(JavaLanguageVersion.of(17))
   }
+  withSourcesJar()
+  withJavadocJar()
 }
 
 tasks.withType<Test>().configureEach {
@@ -39,5 +42,15 @@ configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
 //    ignoreFailures.set(true)
   filter {
     exclude { it.file.path.contains("$buildDir/generated/") }
+  }
+}
+
+jacoco {
+  toolVersion = "0.8.11"
+}
+tasks.jacocoTestReport {
+  reports {
+    csv.required.set(false)
+    xml.required.set(true)
   }
 }
