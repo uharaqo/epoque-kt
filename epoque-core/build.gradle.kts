@@ -1,7 +1,6 @@
-import Sonatype_publish_gradle.Publish.toSonatype
-
 plugins {
   id("kotlin-conventions")
+  id("sonatype-publish")
   // this serialization plugin is only required for testing
   kotlin("plugin.serialization") version libs.versions.kotlin.asProvider().get()
 }
@@ -18,9 +17,9 @@ dependencies {
   testImplementation(libs.logback.classic)
 }
 
-toSonatype(
-  userName = "uharaqo",
-  repoName = "epoque-kt",
-  artifactName = project.name,
-  artifactDesc = "Transactional Event Sourcing Processor in Kotlin",
-)
+sonatypePublish {
+  userName = "uharaqo"
+  repoName = "epoque-kt"
+  artifactName = project.name
+  artifactDesc = "Transactional Event Sourcing Processor in Kotlin"
+}
