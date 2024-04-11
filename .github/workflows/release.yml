@@ -47,7 +47,7 @@ jobs:
       - name: Generate JaCoCo badge
         uses: cicirello/jacoco-badge-generator@v2
         with:
-          jacoco-csv-file: "build/jacoco/generateJacocoReport.csv"
+          jacoco-csv-file: "build/jacoco/generateJacocoReport/generateJacocoReport.csv"
           badges-directory: badges
           generate-branches-badge: true
           generate-summary: true
@@ -61,7 +61,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: jacoco-report
-          path: "build/jacoco/generateJacocoReport.csv"
+          path: "build/jacoco/generateJacocoReport/generateJacocoReport.csv"
 
       - name: Commit and push the coverage badges and summary file
         if: ${{ github.event_name != 'pull_request' }}
