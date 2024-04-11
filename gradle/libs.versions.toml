@@ -1,6 +1,6 @@
 [versions]
 # kotlin
-kotlin = "1.9.22"
+kotlin = "1.9.23"
 kotlin-ksp = "1.9.22-1.0.17"
 kotlin-serialization = "1.6.2"
 kotlin-coroutines = "1.8.0"
