@@ -10,7 +10,7 @@ kotlin-ktlint = "11.6.1"
 jooq = "3.19.3"
 jooq-gradle-plugin = "8.2"
 h2 = "2.2.224"
-postgres-driver = "42.7.1"
+postgres-driver = "42.7.3"
 mysql-driver = "8.0.33"
 hikaricp = "5.1.0"
 
