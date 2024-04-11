@@ -16,7 +16,7 @@ hikaricp = "5.1.0"
 
 # util
 slf4j = "2.0.12"
-arrow = "1.2.1"
+arrow = "1.2.4"
 protobuf = "4.26.1"
 
 # test, etc.
