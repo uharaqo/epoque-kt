@@ -1,7 +1,6 @@
-import Sonatype_publish_gradle.Publish.toSonatype
-
 plugins {
   id("kotlin-conventions")
+  id("sonatype-publish")
 }
 
 dependencies {
@@ -17,9 +16,9 @@ dependencies {
   testImplementation(libs.h2)
 }
 
-toSonatype(
-  userName = "uharaqo",
-  repoName = "epoque-kt",
-  artifactName = project.name,
-  artifactDesc = "jOOQ plugin for epoque-kt",
-)
+sonatypePublish {
+  userName = "uharaqo"
+  repoName = "epoque-kt"
+  artifactName = project.name
+  artifactDesc = "jOOQ plugin for epoque-kt"
+}
