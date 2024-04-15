@@ -10,7 +10,7 @@ dependencies {
   api(libs.jooq.kotlin)
   api(libs.jooq.kotlin.coroutines)
   implementation("io.mcarle:konvert-api:3.1.0")
-  ksp("io.mcarle:konvert:3.0.1")
+  ksp("io.mcarle:konvert:3.2.0")
 
   // test
   testImplementation(project(":epoque-test"))
