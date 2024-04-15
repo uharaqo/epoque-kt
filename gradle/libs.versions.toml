@@ -25,7 +25,7 @@ kotest = "5.8.0"
 kotest-arrow = "1.4.0"
 kotest-testcontainers = "2.0.2"
 mockk = "1.13.10"
-testcontainers-postgres = "1.19.5"
+testcontainers-postgres = "1.19.7"
 testcontainers-mysql = "1.19.5"
 
 logback = "1.4.14"
