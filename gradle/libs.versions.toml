@@ -21,7 +21,7 @@ protobuf = "4.26.1"
 
 # test, etc.
 spotless = "6.25.0"
-kotest = "5.8.0"
+kotest = "5.8.1"
 kotest-arrow = "1.4.0"
 kotest-testcontainers = "2.0.2"
 mockk = "1.13.10"
