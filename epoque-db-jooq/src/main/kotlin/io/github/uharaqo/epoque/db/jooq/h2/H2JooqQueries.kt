@@ -116,17 +116,15 @@ class H2JooqQueries(
     key: JournalKey,
     version: Long,
   ): Boolean =
-    with(tableDefinition) {
-      try {
+    runCatching {
+      with(tableDefinition) {
         insertInto(EVENT)
           .columns(GROUP, ID, VERSION, TYPE, CONTENT)
           .values(key.groupId.unwrap, key.id.unwrap, version, "(LOCK)", JSONB.jsonb(null))
-          //        .onConflictDoNothing() // not supported in H2
+          // .onConflictDoNothing() // TODO: not supported in H2
           .awaitFirstOrNull() == 1
-      } catch (ignored: Exception) {
-        false
       }
-    }
+    }.getOrElse { false } // ignore exception
 
   /** Remove the dummy record. The transaction holds the row lock */
   private suspend fun DSLContext.deleteDummyEventForLock(
