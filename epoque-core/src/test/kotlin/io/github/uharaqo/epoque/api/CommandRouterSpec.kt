@@ -17,9 +17,7 @@ class CommandRouterSpec : StringSpec(
 
     "Command decoder and processor are found and executed properly in a Workflow" {
       // when
-      val output = router.find(dummyCommandType).rethrow().process(
-        input,
-      ).rethrow()
+      val output = router.find(dummyCommandType).rethrow().process(input).rethrow()
 
       // then
       output.events shouldBe capturedOutput.captured.events

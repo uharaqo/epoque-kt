@@ -1,19 +1,25 @@
 package io.github.uharaqo.epoque.integration
 
+import io.github.uharaqo.epoque.Epoque
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.db.jooq.TableDefinition
+import io.github.uharaqo.epoque.db.jooq.mysql.newMysqlJooqContext
+import io.github.uharaqo.epoque.db.jooq.mysql.toMysqlEventStore
+import io.github.uharaqo.epoque.test.api.JooqDbEnvironment
 import org.jooq.DSLContext
 
-abstract class TestEnvironment {
+abstract class TestEnvironment(val dbEnv: JooqDbEnvironment) : JooqDbEnvironment by dbEnv {
   val projectId1 = JournalId("Project1")
   val project1 = projectId1.unwrap
   val taskId1 = JournalId("My First Task")
   val task1 = taskId1.unwrap
+  val startedAt = 123L
+  val endedAt = 456L
 
   @JvmInline
   value class RequestId(val value: String)
 
-  fun initTables(ctx: DSLContext) {
+  fun initReadModels(ctx: DSLContext) {
     with(TableDefinition()) {
       ctx.createTableQuery().execute()
       ctx.execute(
@@ -23,14 +29,20 @@ abstract class TestEnvironment {
           |  name TEXT NOT NULL,
           |  PRIMARY KEY (id)
           |);
-          |
+        """.trimMargin(),
+      )
+      ctx.execute(
+        """
           |CREATE TABLE IF NOT EXISTS task (
           |  id VARCHAR(255) NOT NULL,
           |  name TEXT NOT NULL,
           |  project_id TEXT REFERENCES project(id),
           |  PRIMARY KEY (id)
           |);
-          |
+        """.trimMargin(),
+      )
+      ctx.execute(
+        """
           |CREATE TABLE IF NOT EXISTS task_entry (
           |  task_id VARCHAR(255) NOT NULL REFERENCES task(id),
           |  seq SERIAL NOT NULL,
@@ -38,9 +50,13 @@ abstract class TestEnvironment {
           |  ended_at BIGINT,
           |  PRIMARY KEY (task_id, seq)
           |);
-          |
         """.trimMargin(),
       )
     }
   }
+}
+
+class MySqlDbEnvironment : JooqDbEnvironment {
+  override val dsl = Epoque.newMysqlJooqContext()
+  override val eventStore = TableDefinition().toMysqlEventStore(dsl)
 }

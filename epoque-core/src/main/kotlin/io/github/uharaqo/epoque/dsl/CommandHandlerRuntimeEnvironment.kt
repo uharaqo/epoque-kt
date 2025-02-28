@@ -13,7 +13,7 @@ import io.github.uharaqo.epoque.api.CommandOutput
 import io.github.uharaqo.epoque.api.CommandRouter
 import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.EpoqueEnvironment
-import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_CHAIN_FAILURE
+import io.github.uharaqo.epoque.api.EpoqueException.Cause.CHAINED_COMMAND_FAILURE
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_PREPARATION_FAILURE
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.NOTIFICATION_FAILURE
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.PROJECTION_FAILURE
@@ -25,7 +25,6 @@ import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.asOutputMetadata
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
-import kotlin.coroutines.coroutineContext
 
 class DefaultCommandHandlerRuntimeEnvironment<C, S, E>(
   private val commandHandlerSetup: CommandHandlerSetup<C, S, E>,
@@ -80,7 +79,6 @@ class DefaultCommandHandlerRuntimeEnvironment<C, S, E>(
   override suspend fun beforeCommit(output: CommandOutput) {
     commandHandlerSetup.projections.forEach {
       try {
-        coroutineContext
         it.invoke(TransactionContext.get()!!)
       } catch (e: Exception) {
         throw PROJECTION_FAILURE.toException(e)
@@ -92,7 +90,7 @@ class DefaultCommandHandlerRuntimeEnvironment<C, S, E>(
       try {
         commandRouter.process(command).getOrElse { throw it }
       } catch (e: Exception) {
-        throw COMMAND_CHAIN_FAILURE.toException(e, message = command.type.toString())
+        throw CHAINED_COMMAND_FAILURE.toException(e, message = command.type.toString())
       }
     }
   }

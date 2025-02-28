@@ -14,6 +14,8 @@ dependencies {
 
   // test
   testImplementation(project(":epoque-test"))
+  testImplementation(project(":epoque-db-jooq-mysql"))
+  testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.kotest.runner.junit5)
   testImplementation(libs.kotest.assertions.arrow)
   testImplementation(libs.mockk)

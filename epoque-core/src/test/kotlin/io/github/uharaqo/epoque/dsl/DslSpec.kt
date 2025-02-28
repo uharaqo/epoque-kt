@@ -164,7 +164,7 @@ class DslSpec : StringSpec(
       out shouldBeLeft COMMAND_REJECTED.toException(message = "Rejected")
     }
 
-    "Full features" {
+    "All features" {
       val (eventWriter, capturedOutput) = newMockWriter()
       val recorded = mutableListOf<String>()
       fun record(s: String) {

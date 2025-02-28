@@ -40,6 +40,6 @@ val TASK_PROJECTIONS = Epoque.projectionFor(TASK_JOURNAL) {
       .where(field("task_id").eq(k.id.unwrap))
       .execute()
       .takeIf { it == 1 }
-      ?: error("Failed to insert task: $e")
+      ?: error("Failed to update task: $e")
   }
 }

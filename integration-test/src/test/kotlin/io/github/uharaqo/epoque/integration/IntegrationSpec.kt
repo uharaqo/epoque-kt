@@ -18,9 +18,8 @@ import io.github.uharaqo.epoque.integration.epoque.task.Task
 import io.github.uharaqo.epoque.integration.epoque.task.TaskCreated
 import io.github.uharaqo.epoque.integration.epoque.task.TaskEnded
 import io.github.uharaqo.epoque.integration.epoque.task.TaskStarted
+import io.github.uharaqo.epoque.test.api.H2JooqDbEnvironment
 import io.github.uharaqo.epoque.test.impl.DebugLogger
-import io.github.uharaqo.epoque.test.impl.newH2EventStore
-import io.github.uharaqo.epoque.test.impl.newH2JooqContext
 import io.github.uharaqo.epoque.test.impl.newTestEnvironment
 import io.github.uharaqo.epoque.test.impl.newTester
 import io.kotest.assertions.throwables.shouldThrow
@@ -31,15 +30,23 @@ import org.jooq.impl.DSL
 
 class IntegrationSpec : StringSpec(
   {
-    val startedAt = 123L
-    val endedAt = 456L
+    initReadModels(dsl)
 
-    initTables(Epoque.newH2JooqContext())
+    val router = Epoque.routerFor(PROJECT_JOURNAL, TASK_JOURNAL) {
+      environment {
+        eventStore = Companion.eventStore
+        globalCallbackHandler =
+          DebugLogger() +
+            ProjectionRegistry.from(listOf(PROJECT_PROJECTIONS, TASK_PROJECTIONS))
+              .toCallbackHandler()
+      }
+    }
 
     val callbackHandler = DebugLogger() +
       ProjectionRegistry.from(listOf(PROJECT_PROJECTIONS, TASK_PROJECTIONS)).toCallbackHandler()
-    val environment = Epoque.newTestEnvironment(globalCallbackHandler = callbackHandler)
-    val tester = Epoque.newTester(ROUTER, environment)
+    val environment =
+      Epoque.newTestEnvironment(Companion, globalCallbackHandler = callbackHandler)
+    val tester = Epoque.newTester(router, environment)
 
     val meta = mutableMapOf("RequestId" to TestEnvironment.RequestId("123"))
 
@@ -90,36 +97,28 @@ class IntegrationSpec : StringSpec(
     }
 
     "Projection Result" {
-      fun Map<String, Any?>.fixKeys() = mapKeys { (k, _) -> k.uppercase() }
-
-      Epoque.newH2JooqContext().apply {
-        selectFrom(DSL.table("project")).fetch()
-          .intoMaps() shouldBe listOf(
-          mapOf("id" to project1, "name" to project1).fixKeys(),
+      dsl.apply {
+        selectFrom(DSL.table("project")).fetch().intoMaps() shouldBe listOf(
+          mapOf("id" to project1, "name" to project1),
         )
         selectFrom(DSL.table("task")).fetch()
           .intoMaps() shouldBe listOf(
-          mapOf("id" to "Foo", "name" to "TaskX", "project_id" to null).fixKeys(),
-          mapOf("id" to task1, "name" to task1, "project_id" to project1).fixKeys(),
+          mapOf("id" to "Foo", "name" to "TaskX", "project_id" to null),
+          mapOf("id" to task1, "name" to task1, "project_id" to project1),
         )
         selectFrom(DSL.table("task_entry")).fetch()
           .intoMaps() shouldBe listOf(
-          mapOf("task_id" to task1, "seq" to 1, "started_at" to startedAt, "ended_at" to endedAt)
-            .fixKeys(),
+          mapOf(
+            "task_id" to task1,
+            "seq" to 1, // for mysql, use org.jooq.types.ULong.valueOf(1)
+            "started_at" to startedAt,
+            "ended_at" to endedAt,
+          ),
         )
       }
     }
   },
 ) {
-  companion object : TestEnvironment() {
-    val ROUTER = Epoque.routerFor(PROJECT_JOURNAL, TASK_JOURNAL) {
-      environment {
-        eventStore = Epoque.newH2EventStore()
-        globalCallbackHandler =
-          DebugLogger() +
-            ProjectionRegistry.from(listOf(PROJECT_PROJECTIONS, TASK_PROJECTIONS))
-              .toCallbackHandler()
-      }
-    }
-  }
+  companion object : TestEnvironment(H2JooqDbEnvironment())
+//  companion object : TestEnvironment(MySqlDbEnvironment())
 }

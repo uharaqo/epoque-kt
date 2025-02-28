@@ -1,5 +1,6 @@
 package io.github.uharaqo.epoque.db.jooq
 
+import io.github.uharaqo.epoque.api.EventStore
 import io.github.uharaqo.epoque.api.Failable
 import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.SerializedData
@@ -23,3 +24,5 @@ interface JooqQueries<D> {
 
   suspend fun lockNextEvent(ctx: DSLContext, key: JournalKey): Failable<Unit>
 }
+
+fun JooqQueries<*>.toEventStore(dsl: DSLContext): EventStore = JooqEventStore(dsl, this)
