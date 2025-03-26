@@ -45,7 +45,9 @@ data class CommandInput(
   val payload: SerializedCommand,
   val metadata: Map<out Any, Any> = emptyMap(),
   val commandExecutorOptions: CommandExecutorOptions? = null,
-)
+) {
+  companion object : EpoqueContextKey<CommandInput>
+}
 
 data class CommandContext(
   val key: JournalKey,

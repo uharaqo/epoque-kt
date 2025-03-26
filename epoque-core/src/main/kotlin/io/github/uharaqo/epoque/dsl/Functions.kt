@@ -54,7 +54,11 @@ fun Iterable<Journal<*, *, *>>.toEventCodecRegistry(): EventCodecRegistry =
   EventCodecRegistry(buildMap { this@toEventCodecRegistry.forEach { putAll(it.eventCodecRegistry.registry) } })
 
 fun Iterable<Journal<*, *, *>>.toCommandCodecRegistry(): CommandCodecRegistry =
-  CommandCodecRegistry(buildMap { this@toCommandCodecRegistry.forEach { putAll(it.commandCodecRegistry.registry) } })
+  CommandCodecRegistry(
+    buildMap {
+      this@toCommandCodecRegistry.forEach { putAll(it.commandCodecRegistry.registry) }
+    },
+  )
 
 fun Iterable<Journal<*, Any?, Any>>.toEventHandlerRegistry(): EventHandlerRegistry<Any?, Any> =
   EventHandlerRegistry(

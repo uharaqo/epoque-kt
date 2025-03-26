@@ -14,17 +14,18 @@ class EpoqueBuilder(private val journals: List<Journal<*, *, *>>) : EpoqueDsl() 
     val environment = environmentBuilder.shouldBeDefined("environment").build()
 
     @Suppress("UNCHECKED_CAST")
-    val eventHandlers = (journals as List<Journal<Any, Any?, Any>>).toEventHandlerRegistry()
-    val eventCodecs = journals.toEventCodecRegistry()
-    val commandCodecs = journals.toCommandCodecRegistry()
-    val commandProcessors = journals.toCommandProcessorRegistry(commandCodecs, environment)
+    val commandCodecRegistry = (journals as List<Journal<Any, Any?, Any>>).toCommandCodecRegistry()
+    val commandProcessors = journals.toCommandProcessorRegistry(commandCodecRegistry, environment)
+
+    val eventHandlers = journals.toEventHandlerRegistry()
+    val eventCodecRegistry = journals.toEventCodecRegistry()
 
     return DefaultCommandRouter(
       environment,
-      eventCodecs,
       eventHandlers,
-      commandCodecs,
       commandProcessors,
+      commandCodecRegistry,
+      eventCodecRegistry,
     )
   }
 }

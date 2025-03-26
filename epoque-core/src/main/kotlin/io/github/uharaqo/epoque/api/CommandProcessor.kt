@@ -1,7 +1,7 @@
 package io.github.uharaqo.epoque.api
 
-import arrow.core.flatMap
 import arrow.core.left
+import arrow.core.raise.either
 import arrow.core.right
 import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_NOT_SUPPORTED
 
@@ -18,11 +18,21 @@ value class CommandProcessorRegistry(
 }
 
 interface CommandRouter : CommandProcessor {
-  val commandCodecRegistry: CommandCodecRegistry
   val commandProcessorRegistry: CommandProcessorRegistry
+  val commandCodecRegistry: CommandCodecRegistry
+  val eventCodecRegistry: EventCodecRegistry
 
-  override suspend fun process(input: CommandInput): Failable<CommandOutput> =
-    commandProcessorRegistry.find(input.type).flatMap { it.process(input) }
+  override suspend fun process(input: CommandInput): Failable<CommandOutput> = either {
+    val processor = commandProcessorRegistry.find(input.type).bind()
+    EpoqueContext.with(
+      {
+        put(CommandRouter, this@CommandRouter)
+        put(CommandInput, input)
+      },
+    ) {
+      processor.process(input).bind()
+    }
+  }
 
   companion object : EpoqueContextKey<CommandRouter>
 }

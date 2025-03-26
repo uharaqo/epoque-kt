@@ -26,11 +26,13 @@ import io.github.uharaqo.epoque.api.EventWriter
 import io.github.uharaqo.epoque.api.Failable
 import io.github.uharaqo.epoque.api.JournalGroupId
 import io.github.uharaqo.epoque.api.JournalKey
+import io.github.uharaqo.epoque.api.OutputMetadata
 import io.github.uharaqo.epoque.api.SummaryCache
 import io.github.uharaqo.epoque.api.SummaryId
 import io.github.uharaqo.epoque.api.SummaryType
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.TransactionStarter
+import io.github.uharaqo.epoque.api.VersionedEvent
 import io.github.uharaqo.epoque.api.VersionedSummary
 import io.github.uharaqo.epoque.api.asInputMetadata
 import io.github.uharaqo.epoque.api.getRemainingTimeMillis
@@ -39,7 +41,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 
 /** Create a [CommandExecutor] and executes it */
 interface CommandExecutorFactory<C, S, E> : CommandProcessor {
-  suspend fun create(): CommandExecutor<C, S, E>
+  fun create(): CommandExecutor<C, S, E>
 
   override suspend fun process(input: CommandInput): Failable<CommandOutput> =
     create().process(input)
@@ -82,7 +84,12 @@ class CommandExecutor<C, S, E>(
         receivedTime = Instant.now(),
       )
 
-    return EpoqueContext.with({ put(DeserializedCommand, command) }) {
+    return EpoqueContext.with(
+      {
+        put(CommandContext, context)
+        put(DeserializedCommand, command)
+      },
+    ) {
       execute(context, command)
     }
   }
@@ -100,6 +107,18 @@ class CommandExecutor<C, S, E>(
 
           execute(command, commandHandler, context, tx).bind()
             .also { callbackHandler.beforeCommit(it) }
+            .let { out ->
+              extractChainedCommandOutputs(out.metadata)
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { outputs ->
+                  CommandOutput(
+                    events = mergeEvents(out, outputs),
+                    metadata = mergeMetadata(out, outputs),
+                    context = out.context,
+                  )
+                }
+                ?: out
+            }
         }.bind()
       }.bind()
     }
@@ -139,4 +158,28 @@ class CommandExecutor<C, S, E>(
     CommandContext.get()?.getRemainingTimeMillis()
       ?.let { this.copy(timeoutMillis = it) }
       ?: this
+
+  @Suppress("UNCHECKED_CAST")
+  private fun extractChainedCommandOutputs(metadata: OutputMetadata): List<CommandOutput>? =
+    metadata.unwrap[CHAINED_COMMAND_OUTPUTS_METADATA_KEY]?.let { it as List<CommandOutput> }
+
+  private fun mergeEvents(out: CommandOutput, outputs: List<CommandOutput>): List<VersionedEvent> =
+    buildList {
+      addAll(out.events)
+      outputs.asSequence().forEach { addAll(it.events) }
+    }
+
+  private fun mergeMetadata(out: CommandOutput, outputs: List<CommandOutput>): OutputMetadata =
+    buildMap {
+      putAll(out.metadata.unwrap)
+      outputs.forEach {
+        it.metadata.unwrap.asSequence()
+          .filter { it.key != CHAINED_COMMAND_OUTPUTS_METADATA_KEY }
+          .forEach { (k, v) -> put(k, v) }
+      }
+    }.let(::OutputMetadata)
+
+  companion object {
+    const val CHAINED_COMMAND_OUTPUTS_METADATA_KEY = "ChainedCommandOutputs"
+  }
 }

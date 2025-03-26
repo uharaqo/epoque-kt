@@ -23,21 +23,27 @@ import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.asOutputMetadata
+import io.github.uharaqo.epoque.dsl.CommandExecutor.Companion.CHAINED_COMMAND_OUTPUTS_METADATA_KEY
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 
 class DefaultCommandHandlerRuntimeEnvironment<C, S, E>(
-  private val commandHandlerSetup: CommandHandlerSetup<C, S, E>,
+  commandHandlerSetup: CommandHandlerSetup<C, S, E>,
   private val commandCodecRegistry: CommandCodecRegistry,
   private val journalChecker: JournalChecker,
 ) : CommandHandler<C, S, E>, CommandHandlerRuntimeEnvironment<C, S, E>, CallbackHandler {
+
+  private val handler = commandHandlerSetup.handler
+  private val prepare = commandHandlerSetup.prepare
+  private val projections = commandHandlerSetup.projections
+  private val notifications = commandHandlerSetup.notifications
 
   private val events = ConcurrentLinkedQueue<E>()
   private val metadata = ConcurrentHashMap<Any, Any>()
   private val chainedCommands = ConcurrentLinkedQueue<CommandInput>()
 
   override suspend fun handle(c: C, s: S): CommandHandlerOutput<E> {
-    commandHandlerSetup.handler(this, c, s)
+    handler(this, c, s)
     return complete()
   }
 
@@ -45,12 +51,16 @@ class DefaultCommandHandlerRuntimeEnvironment<C, S, E>(
     id: JournalId,
     command: Any,
     options: CommandExecutorOptions,
-    metadata: Map<Any, Any>,
+    metadata: Map<out Any, Any>,
   ) {
     val type = CommandType.of(command::class.java)
     val serialized =
       commandCodecRegistry.find<Any>(type).flatMap { it.encode(command) }.getOrElse { throw it }
-    chainedCommands += CommandInput(id, type, serialized, metadata, options)
+    chain(CommandInput(id, type, serialized, metadata, options))
+  }
+
+  override fun chain(input: CommandInput) {
+    chainedCommands += input
   }
 
   override fun emit(events: List<E>, metadata: Map<Any, Any>) {
@@ -67,7 +77,7 @@ class DefaultCommandHandlerRuntimeEnvironment<C, S, E>(
     CommandHandlerOutput(events.toList(), metadata.asOutputMetadata())
 
   override suspend fun beforeBegin(context: CommandContext) {
-    commandHandlerSetup.prepare?.let {
+    prepare?.let {
       try {
         it.invoke()
       } catch (e: Exception) {
@@ -77,7 +87,7 @@ class DefaultCommandHandlerRuntimeEnvironment<C, S, E>(
   }
 
   override suspend fun beforeCommit(output: CommandOutput) {
-    commandHandlerSetup.projections.forEach {
+    projections.forEach {
       try {
         it.invoke(TransactionContext.get()!!)
       } catch (e: Exception) {
@@ -85,18 +95,16 @@ class DefaultCommandHandlerRuntimeEnvironment<C, S, E>(
       }
     }
 
-    chainedCommands.forEach { command ->
-      val commandRouter = CommandRouter.get()!!
-      try {
-        commandRouter.process(command).getOrElse { throw it }
-      } catch (e: Exception) {
-        throw CHAINED_COMMAND_FAILURE.toException(e, message = command.type.toString())
+    chainedCommands
+      .map { input ->
+        CommandRouter.get()!!.process(input)
+          .getOrElse { e -> throw CHAINED_COMMAND_FAILURE.toException(e, input.type.toString()) }
       }
-    }
+      .let { metadata.put(CHAINED_COMMAND_OUTPUTS_METADATA_KEY, it) }
   }
 
   override suspend fun afterCommit(output: CommandOutput) {
-    commandHandlerSetup.notifications.forEach {
+    notifications.forEach {
       try {
         it.invoke(DefaultNotificationContext)
       } catch (e: Exception) {
@@ -115,7 +123,7 @@ class DefaultCommandExecutorFactory<C, S, E>(
   private val environment: EpoqueEnvironment,
 ) : CommandExecutorFactory<C, S, E> {
 
-  override suspend fun create(): CommandExecutor<C, S, E> {
+  override fun create(): CommandExecutor<C, S, E> {
     val env =
       DefaultCommandHandlerRuntimeEnvironment(
         commandHandlerSetup,

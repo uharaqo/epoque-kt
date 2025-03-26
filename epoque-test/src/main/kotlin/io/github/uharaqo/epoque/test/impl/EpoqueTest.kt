@@ -103,14 +103,15 @@ class DefaultCommandTester<S, E : Any>(
       val type = CommandType.of(command::class.java)
       val commandCodec = journal.commandCodecRegistry.find<Any>(type).bind()
       val payload = commandCodec.encode(command).bind()
-      val input = CommandInput(id, type, payload, metadata)
+      val input =
+        CommandInput(id, type, payload, metadata, environment.defaultCommandExecutorOptions)
 
       val result = runBlocking { commandRouter.process(input) }.bind()
 
       val summaryProvider =
         SummaryProvider(journal, environment.transactionStarter, environment.eventReader)
 
-      DefaultCommandValidator(input, result, journal, summaryProvider).apply(block)
+      DefaultCommandValidator(input, result, commandRouter, summaryProvider).apply(block)
     }.getOrElse { throw it }
   }
 }
@@ -118,13 +119,13 @@ class DefaultCommandTester<S, E : Any>(
 class DefaultCommandValidator<S, E : Any>(
   val input: CommandInput,
   result: CommandOutput,
-  val journal: Journal<*, S, E>,
+  private val router: CommandRouter,
   private val summaryProvider: SummaryProvider<S, E>,
 ) : Validator<S, E> {
 
   override val events: List<E> =
     result.events.map { ve ->
-      journal.eventCodecRegistry.find<E>(ve.type)
+      router.eventCodecRegistry.find<E>(ve.type)
         .flatMap { it.decode(ve.event) }
         .getOrElse { throw it }
     }

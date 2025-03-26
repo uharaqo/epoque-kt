@@ -196,9 +196,9 @@ class DslSpec : StringSpec(
               prepare {
                 record("Prepared")
                 "Prepared Param"
-              } handle { s, e, x ->
+              } handle { s, e, v ->
                 record("Handled")
-                emit(ResourceCreated(x))
+                emit(ResourceCreated(v))
                 if (exists(dummyJournalKey)) {
                   chain(dummyJournalKey.id, EmptyCommand)
                 }

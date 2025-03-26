@@ -42,8 +42,7 @@ interface CanWriteEvents<E> : CanSerializeEvents<E> {
     context: CommandContext,
     tx: TransactionContext,
   ): Failable<CommandOutput> = either {
-    val (events: List<E>, metadata: OutputMetadata) = commandHandlerOutput
-
+    val (events, metadata) = commandHandlerOutput
     val versionedEvents = serializeEvents(currentVersion, events).bind()
     val output = CommandOutput(versionedEvents, metadata, context)
 
@@ -145,7 +144,7 @@ interface CanExecuteCommandHandler<C, S, E> :
 
     val commandHandlerOutput =
       catch({ commandHandler.handle(command, currentSummary) }) { t ->
-        raise(if (t is EpoqueException) t else COMMAND_HANDLER_FAILURE.toException(t))
+        raise(t as? EpoqueException ?: COMMAND_HANDLER_FAILURE.toException(t))
       }
 
     writeEvents(commandHandlerOutput, currentVersion, context, tx).bind()

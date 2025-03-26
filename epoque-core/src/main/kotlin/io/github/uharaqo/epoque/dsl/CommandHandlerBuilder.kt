@@ -36,8 +36,8 @@ class CommandHandlerBuilder<C, S, E>(
     handler = block
   }
 
-  override fun <X> prepare(block: suspend () -> X): PreparedCommandHandlerDsl<C, S, E, X> {
-    val preparedParam = AtomicReference<X>()
+  override fun <V> prepare(block: suspend () -> V): PreparedCommandHandlerDsl<C, S, E, V> {
+    val preparedParam = AtomicReference<V>()
     prepare = suspend { preparedParam.set(block()) }
     return PreparedCommandHandlerBuilder(preparedParam) { handler = it }
   }
@@ -65,11 +65,11 @@ class CommandHandlerBuilder<C, S, E>(
     )
 }
 
-class PreparedCommandHandlerBuilder<C, S, E, X>(
-  private val preparedParam: AtomicReference<X>,
+class PreparedCommandHandlerBuilder<C, S, E, V>(
+  private val preparedParam: AtomicReference<V>,
   private val callback: (suspend CommandHandlerRuntimeEnvironment<C, S, E>.(C, S) -> Unit) -> Unit,
-) : PreparedCommandHandlerDsl<C, S, E, X>() {
-  override fun handle(block: suspend CommandHandlerRuntimeEnvironment<C, S, E>.(C, S, X) -> Unit) {
+) : PreparedCommandHandlerDsl<C, S, E, V>() {
+  override fun handle(block: suspend CommandHandlerRuntimeEnvironment<C, S, E>.(C, S, V) -> Unit) {
     callback { c, s -> block(c, s, preparedParam.get()) }
   }
 }

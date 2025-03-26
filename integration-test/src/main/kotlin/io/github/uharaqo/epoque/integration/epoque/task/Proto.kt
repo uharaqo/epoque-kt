@@ -26,6 +26,9 @@ data class TaskCreated(val name: String, val startedAt: Long, val project: Strin
 data class StartTask(val startedAt: Long = System.currentTimeMillis()) : TaskCommand
 
 @Serializable
+data class CreateAndStartTask(val createTask: CreateTask, val startTask: StartTask) : TaskCommand
+
+@Serializable
 data class TaskStarted(val startedAt: Long) : TaskEvent
 
 @Serializable
