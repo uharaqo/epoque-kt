@@ -1,8 +1,12 @@
 package io.github.uharaqo.epoque.dsl
 
+import io.github.uharaqo.epoque.api.BatchCommand
 import io.github.uharaqo.epoque.api.CommandCodec
+import io.github.uharaqo.epoque.api.CommandInput
 import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.DataCodecFactory
+import io.github.uharaqo.epoque.api.SerializedCommand
+import io.github.uharaqo.epoque.api.SerializedData
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.WriteOption
 import java.util.concurrent.atomic.AtomicReference
@@ -21,6 +25,32 @@ class CommandHandlersBuilder<C : Any, S, E : Any> : CommandHandlersDsl<C, S, E>(
 
   fun build(codecFactory: DataCodecFactory): Map<CommandType, CommandHandlerSetup<C, S, E>> =
     handlers.mapValues { it.value.build(codecFactory, defaultWriteOption) }
+
+  override fun <T> supportBatchCommand(type: CommandType, serialize: (T) -> SerializedData) {
+    handlers.put(
+      type,
+      CommandHandlerBuilder<BatchCommand<T>, Any, Any>(type).apply {
+        this.writeOption = WriteOption.JOURNAL_LOCK
+
+        this.handle { c, s ->
+          val input = CommandInput.get()!!
+
+          c.commands.asSequence()
+            .forEach { command ->
+              val clazz =
+                this.runCatching { Class.forName(command.fqcn) }
+                  .getOrElse { this.reject("Unsupported command: ${command.fqcn}") }
+              this.chain(
+                input.copy(
+                  type = CommandType.of(clazz),
+                  payload = SerializedCommand(serialize(command.payload)),
+                ),
+              )
+            }
+        }
+      } as CommandHandlerBuilder<C, S, E>,
+    )
+  }
 }
 
 class CommandHandlerBuilder<C, S, E>(

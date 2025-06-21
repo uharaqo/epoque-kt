@@ -1,13 +1,10 @@
 package io.github.uharaqo.epoque.integration.epoque.task
 
-import arrow.core.getOrElse
-import arrow.core.raise.either
 import io.github.uharaqo.epoque.Epoque
-import io.github.uharaqo.epoque.api.CommandInput
-import io.github.uharaqo.epoque.api.CommandRouter
-import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.WriteOption
+import io.github.uharaqo.epoque.codec.JsonBatchCommand
 import io.github.uharaqo.epoque.codec.JsonCodecFactory
+import io.github.uharaqo.epoque.codec.SerializedJson
 import io.github.uharaqo.epoque.dsl.CommandHandlersDsl
 import io.github.uharaqo.epoque.dsl.EventHandlersDsl
 import io.github.uharaqo.epoque.dsl.MapSummaryCache
@@ -29,7 +26,7 @@ val TASK_JOURNAL = Epoque.journalFor<TaskCommand, Task, TaskEvent> {
     createTask()
     startTask()
     endTask()
-    createAndStartTask()
+    supportBatchCommand<String>(JsonBatchCommand.commandType) { SerializedJson(it) }
   }
 
   events(Task.Empty) {
@@ -56,28 +53,6 @@ private fun COMMANDS.startTask() =
     handle { c, s ->
       if (s !is Task.Default) reject("Not found")
       if (!s.started) emit(c.toTaskStarted())
-    }
-  }
-
-private fun COMMANDS.createAndStartTask() =
-  onCommand<CreateAndStartTask> {
-    writeOption = WriteOption.JOURNAL_LOCK
-
-    handle { c, s ->
-      val input = CommandInput.get()!!
-      either {
-        val codecs = CommandRouter.get()!!.commandCodecRegistry
-
-        val type1 = CommandType.of<CreateTask>()
-        codecs.find<CreateTask>(type1).bind()
-          .encode(c.createTask).bind()
-          .let { chain(input.copy(type = type1, payload = it)) }
-
-        val type2 = CommandType.of<StartTask>()
-        codecs.find<StartTask>(type2).bind()
-          .encode(c.startTask).bind()
-          .let { chain(input.copy(type = type2, payload = it)) }
-      }.getOrElse { reject("ERROR", it) }
     }
   }
 

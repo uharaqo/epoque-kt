@@ -7,6 +7,7 @@ import io.github.uharaqo.epoque.api.EpoqueException.Cause.COMMAND_REJECTED
 import io.github.uharaqo.epoque.api.Journal
 import io.github.uharaqo.epoque.api.JournalId
 import io.github.uharaqo.epoque.api.JournalKey
+import io.github.uharaqo.epoque.api.SerializedData
 import io.github.uharaqo.epoque.api.TransactionContext
 import io.github.uharaqo.epoque.api.WriteOption
 import io.github.uharaqo.epoque.api.keyFor
@@ -32,6 +33,8 @@ abstract class CommandHandlersDsl<C : Any, S, E : Any> {
     type: CommandType,
     block: CommandHandlerDsl<CC, S, E>.() -> Unit,
   )
+
+  abstract fun <T> supportBatchCommand(type: CommandType, f: (T) -> SerializedData)
 }
 
 @DslMarker

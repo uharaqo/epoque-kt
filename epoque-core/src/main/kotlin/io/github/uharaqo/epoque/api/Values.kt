@@ -112,3 +112,12 @@ data class SummaryId(
   val type: SummaryType,
   val key: JournalKey,
 )
+
+interface BatchCommand<T> {
+  val commands: List<Command<T>>
+
+  interface Command<T> {
+    val fqcn: String
+    val payload: T
+  }
+}

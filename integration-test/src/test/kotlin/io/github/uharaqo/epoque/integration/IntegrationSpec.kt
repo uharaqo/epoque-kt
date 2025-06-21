@@ -1,8 +1,11 @@
 package io.github.uharaqo.epoque.integration
 
+import arrow.core.flatMap
 import io.github.uharaqo.epoque.Epoque
+import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.EpoqueException
 import io.github.uharaqo.epoque.api.JournalId
+import io.github.uharaqo.epoque.codec.JsonBatchCommand
 import io.github.uharaqo.epoque.dsl.ProjectionRegistry
 import io.github.uharaqo.epoque.dsl.routerFor
 import io.github.uharaqo.epoque.integration.epoque.project.CreateProject
@@ -10,7 +13,6 @@ import io.github.uharaqo.epoque.integration.epoque.project.PROJECT_JOURNAL
 import io.github.uharaqo.epoque.integration.epoque.project.PROJECT_PROJECTIONS
 import io.github.uharaqo.epoque.integration.epoque.project.Project
 import io.github.uharaqo.epoque.integration.epoque.project.ProjectCreated
-import io.github.uharaqo.epoque.integration.epoque.task.CreateAndStartTask
 import io.github.uharaqo.epoque.integration.epoque.task.CreateTask
 import io.github.uharaqo.epoque.integration.epoque.task.EndTask
 import io.github.uharaqo.epoque.integration.epoque.task.StartTask
@@ -24,6 +26,7 @@ import io.github.uharaqo.epoque.test.api.H2JooqDbEnvironment
 import io.github.uharaqo.epoque.test.impl.DebugLogger
 import io.github.uharaqo.epoque.test.impl.newTestEnvironment
 import io.github.uharaqo.epoque.test.impl.newTester
+import io.kotest.assertions.arrow.core.rethrow
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -123,13 +126,22 @@ class IntegrationSpec : StringSpec(
     "Create and start task (batch)" {
       val taskId2 = JournalId("My Second Task")
       val task2 = taskId2.unwrap
-      taskTester.command(
-        taskId2,
-        CreateAndStartTask(
-          CreateTask(task2, startedAt, project1, setOf("tag1", "tag2")),
-          StartTask(startedAt),
-        ),
-      ) {
+      val commands = listOf(
+        CreateTask(task2, startedAt, project1, setOf("tag1", "tag2")),
+        StartTask(startedAt),
+      )
+      val command = JsonBatchCommand(
+        commands.map { c ->
+          JsonBatchCommand.JsonCommand(
+            fqcn = c.javaClass.canonicalName,
+            payload = TASK_JOURNAL.commandCodecRegistry.find<Any>(CommandType.of(c.javaClass))
+              .flatMap { codec -> codec.encode(c).map { it.unwrap.toText() } }
+              .rethrow(),
+          )
+        },
+      )
+
+      taskTester.command(taskId2, command) {
         events shouldBe listOf(
           TaskCreated(task2, startedAt, project1, setOf("tag1", "tag2")),
           TaskStarted(startedAt),

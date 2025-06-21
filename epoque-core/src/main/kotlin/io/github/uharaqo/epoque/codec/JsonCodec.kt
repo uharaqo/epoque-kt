@@ -1,10 +1,13 @@
 package io.github.uharaqo.epoque.codec
 
+import io.github.uharaqo.epoque.api.BatchCommand
+import io.github.uharaqo.epoque.api.CommandType
 import io.github.uharaqo.epoque.api.DataCodec
 import io.github.uharaqo.epoque.api.DataCodecFactory
 import io.github.uharaqo.epoque.api.SerializedData
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.serializer
 
@@ -36,4 +39,19 @@ class JsonCodecFactory : DataCodecFactory {
   @InternalSerializationApi
   override fun <V : Any> create(type: Class<V>): DataCodec<V> =
     JsonCodec(type, type.kotlin.serializer())
+}
+
+@Serializable
+data class JsonBatchCommand(
+  override val commands: List<JsonCommand>,
+) : BatchCommand<String> {
+  @Serializable
+  data class JsonCommand(
+    override val fqcn: String,
+    override val payload: String,
+  ) : BatchCommand.Command<String>
+
+  companion object {
+    val commandType = CommandType.of(JsonBatchCommand::class.java)
+  }
 }
